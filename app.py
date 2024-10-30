@@ -35,7 +35,7 @@ The sections are:
 - Use bullet points and tables where appropriate.
 - Ensure the content is specific to the provided team TypeFinder types and offers unique insights.
 - Avoid redundancy with previous sections!
-- CRITICAL: NEVER OUTPUT THE PHRASE 'MBTI,' USE 'TypeFinder' IN PLACE OF IT!
+- CRITICAL: NEVER OUTPUT THE PHRASE 'MBTI,' USE 'TypeFinder' IN PLACE OF IT! 
 """
 
 # Define prompts for each section, incorporating your feedback
@@ -151,17 +151,24 @@ typefinder_types = ['INTJ', 'INTP', 'ENTJ', 'ENTP',
                    'ISTJ', 'ISFJ', 'ESTJ', 'ESFJ',
                    'ISTP', 'ISFP', 'ESTP', 'ESFP']
 
-# Function to randomize TypeFinder types
-def randomize_types(team_size):
-    randomized_types = [random.choice(typefinder_types) for _ in range(team_size)]
-    for i in range(team_size):
+# Function to randomize TypeFinder types and trigger a rerun
+def randomize_types_callback():
+    randomized_types = [random.choice(typefinder_types) for _ in range(int(st.session_state['team_size']))]
+    for i in range(int(st.session_state['team_size'])):
         key = f'mbti_{i}'
         st.session_state[key] = randomized_types[i]
+    st.rerun()
 
-st.title('Truity Team Report Generator')
+# Initialize the 'team_size' in session_state if not present
+if 'team_size' not in st.session_state:
+    st.session_state['team_size'] = 5
 
 # Input for team size
-team_size = st.number_input('Enter the number of team members (up to 30)', min_value=1, max_value=30, value=5)
+team_size = st.number_input('Enter the number of team members (up to 30)', 
+                            min_value=1, max_value=30, value=5, key='team_size')
+
+# Add a button to randomize TypeFinder types
+st.button('Randomize Types', on_click=randomize_types_callback)
 
 # Initialize list to store TypeFinder types
 team_typefinder_types = []
@@ -186,11 +193,6 @@ for i in range(int(team_size)):
     else:
         team_typefinder_types.append(None)  # Ensure the list has the same length as team_size
 
-# Add a button to randomize TypeFinder types
-if st.button('Randomize Types'):
-    randomize_types(int(team_size))
-    st.success('TypeFinder types have been randomized!')
-
 # Submit button
 if st.button('Generate Report'):
     if None in team_typefinder_types:
@@ -200,9 +202,14 @@ if st.button('Generate Report'):
             # Prepare the team types as a string
             team_types_str = ', '.join(team_typefinder_types)
             # Prepare the team members list
-            team_members_list = "\n".join([f"{i+1}. Team Member {i+1}: {mbti_type}" for i, mbti_type in enumerate(team_typefinder_types)])
+            team_members_list = "\n".join([f"{i+1}. Team Member {i+1}: {mbti_type}" 
+                                           for i, mbti_type in enumerate(team_typefinder_types)])
             # Initialize the LLM
-            chat_model = ChatOpenAI(openai_api_key=st.secrets['API_KEY'], model_name='gpt-4-1106-preview', temperature=0.2)
+            chat_model = ChatOpenAI(
+                openai_api_key=st.secrets['API_KEY'], 
+                model_name='gpt-4-1106-preview', 
+                temperature=0.2
+            )
             
             # Prepare the initial context
             initial_context_template = PromptTemplate.from_template(initial_context)
