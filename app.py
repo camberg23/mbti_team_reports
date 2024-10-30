@@ -137,7 +137,7 @@ You are responsible for writing the **Actions and Next Steps** section of the re
 - Provide actionable recommendations for team leaders to enhance collaboration and performance, based on the analysis in the previous sections and the specific MBTI types present in the team.
 - Structure the recommendations with subheadings for each area of action (e.g., "Facilitating Effective Communication", "Leveraging Team Strengths", "Addressing Potential Blind Spots", "Enhancing Personal Development", "Continuous Improvement").
 - Under each subheading, provide bullet points or numbered lists of specific actions.
-- Immediately end your outputs after the last bullet, do not include any concluding filler text after this (ie, NO filler concluding paragraph like "By following these recommendations...").
+- Immediately end your outputs after the last bullet, do not add anything after the final bullet! ie, NO concluding filler text after this (NO filler concluding paragraph like "By following these recommendations...", "By integrating these actions...").
 - Required length: Approximately 450 words.
 
 **Conclude the report by adding your section below:**
