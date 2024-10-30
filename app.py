@@ -1,63 +1,86 @@
-from openai import OpenAI
 import streamlit as st
 from langchain_community.chat_models import ChatOpenAI
 from langchain.prompts import PromptTemplate 
 from langchain.chains import LLMChain
 
-generate_content = """
-Your job is to help provide a human writer with key bullet points that capture personality types in the {MODEL} personality framework for all of the major characters from a given TV show/movie/book/etc based on your knowledge of each type.
+generate_team_report = """
+You are an expert organizational psychologist specializing in team dynamics and personality assessments based on the Myers-Briggs Type Indicator (MBTI) framework.
 
-AGAIN, THE SELECTED FRAMEWORK IS: {MODEL}
+**Task:** Generate a comprehensive team personality report for a team whose members have the following MBTI types:
+{TEAM_TYPES}
 
-(IF AND ONLY IF the selected framework is Myers-Briggs and you plan to label or name any of the types, please use the following names only. Note you don't have to do this, but if you do use the names in addition to the types, use these names: INFP: The Healer, INTJ: The Mastermind, INFJ: The Counselor, INTP: The Architect, ENFP: The Champion, ENTJ: The Commander, ENTP: The Visionary, ENFJ: The Teacher, ISFJ: The Protector, ISFP: The Composer, ISTJ: The Inspector, ISTP: The Craftsperson, ESFJ: The Provider, ESFP: The Performer, ESTJ: The Supervisor, ESTP: The Dynamo)
+**Your report should include the following sections:**
 
-Here is the specific character universe for which you should generate the appropriate personality types: {X}
+1. **Team Profile:**
+   - Determine the overall "team type" by identifying the most common traits among all team members (e.g., if the majority are Extraverted, Intuitive, Feeling, and Judging, the team type is ENFJ).
+   - Provide an overview of this team type, including key characteristics and how it influences team dynamics.
 
-Your job is to output ALL of the key characters related to the above universe and their type assignment as headers, and the rich justification for and evidence related to assigning that character to that type as bullets below that header.
-SPECIAL NOTE: if the SELECTED FRAMEWORK is Big Five, you cannot do typing in the same way as the other models. Therefore, still output the major characters and attempt to characterize them across all five traits (very low, low, medium, high, very high), using rich evidence for each one.
+2. **Type Distribution:**
+   - Present a percentage breakdown of each MBTI type within the team.
+   - Explain what the distribution suggests about the team's diversity in thinking and working styles.
 
-It should be as rich information as possible/appropriate for each character, using specific details or actions from the story to justify your type/trait assignment. It is okay to have duplicate types (give the best and most honest type assignment possible), but be mindful at the same time not to output, eg, 10 characters of the same type (this wouldn't make for a great article!). Strike the balance, but prioritize accurately nailing the types.
+3. **Team Insights:**
+   - **Strengths:** Highlight the collective strengths of the team based on the prevalent personality traits.
+   - **Blind Spots:** Identify potential blind spots or challenges the team may face due to less represented traits.
 
-Again, a human is going to take your outputs as an outline/reference for writing a polished blog piece, so you don't need to output polished text yourself, just make sure the core ideas and key raw content is there. It does not have to be pretty!
+4. **Type Preference Breakdown:**
+   - For each MBTI dimension (Extraversion vs. Introversion, Sensing vs. Intuition, Thinking vs. Feeling, Judging vs. Perceiving), calculate the team's percentage distribution.
+   - Explain what these percentages mean for team communication, decision-making, and problem-solving.
 
-Formatting requirements: make sure you immediately output the specified content, no preface or conclusion, and make sure it is in Markdown for easy formatting.
+5. **Actions and Next Steps:**
+   - Provide actionable recommendations for team leaders to enhance collaboration and performance.
+   - Suggest resources or strategies tailored to the team's unique personality composition.
 
-YOUR OUTPUTS:
+**Formatting Requirements:**
+
+- Use clear headings and subheadings for each section.
+- Write in Markdown format for easy readability.
+- Use bullet points and tables where appropriate.
+- Ensure the content is specific to the provided team MBTI types and offers unique insights.
+
+**Begin your report below:**
 """
 
-st.title('Get character personalities from any movie/TV show')
+st.title('Team Personality Report Generator')
 
-# Dropdown for selecting the personality model with no option selected by default
-model_type = st.selectbox(
-    'Choose a Personality Model',
-    ('Select a model', 'DISC', 'Enneagram', 'Myers-Briggs', 'Big Five'),
-    index=0,
-    key='model_type'
-)
+# Input for team size
+team_size = st.number_input('Enter the number of team members (up to 30)', min_value=1, max_value=30, value=5)
 
-# Text area for defining the task
-task_description = st.text_area('Enter TV show/movie here, with any additional context', placeholder='Gilmore Girls, top 10 characters | all major Harry Potter characters | protagonists from major Disney movies | etc.',
-                                key='task_description',max_chars=400)
+# Initialize list to store MBTI types
+team_mbti_types = []
+
+# Input for MBTI types of each team member
+st.header('Enter MBTI types for each team member')
+mbti_options = ['INTJ', 'INTP', 'ENTJ', 'ENTP',
+                'INFJ', 'INFP', 'ENFJ', 'ENFP',
+                'ISTJ', 'ISFJ', 'ESTJ', 'ESFJ',
+                'ISTP', 'ISFP', 'ESTP', 'ESFP']
+
+for i in range(int(team_size)):
+    mbti_type = st.selectbox(f'Team Member {i+1}', options=['Select MBTI Type'] + mbti_options, key=f'mbti_{i}')
+    if mbti_type != 'Select MBTI Type':
+        team_mbti_types.append(mbti_type)
 
 # Submit button
-if st.button('Submit'):
-    if model_type == 'Select a model':
-        st.error('Please select a personality model.')
-    elif not task_description.strip():
-        st.error('Please define the task.')
+if st.button('Generate Report'):
+    if len(team_mbti_types) < team_size:
+        st.error('Please select MBTI types for all team members.')
     else:
-        with st.spinner('Generating, standby...'):
+        with st.spinner('Generating report, please wait...'):
+            # Prepare the team types as a string
+            team_types_str = ', '.join(team_mbti_types)
+            # Initialize the LLM
             chat_model = ChatOpenAI(openai_api_key=st.secrets['API_KEY'], model_name='gpt-4-1106-preview', temperature=0.2)
-            chat_chain = LLMChain(prompt=PromptTemplate.from_template(generate_content), llm=chat_model)
-            generated_output = chat_chain.run(MODEL=model_type, X=task_description)
+            chat_chain = LLMChain(prompt=PromptTemplate.from_template(generate_team_report), llm=chat_model)
+            generated_report = chat_chain.run(TEAM_TYPES=team_types_str)
             
-            # Display the LLM output using markdown
-            st.write(generated_output)
+            # Display the report using markdown
+            st.markdown(generated_report)
             
-            # Use Streamlit's download button to download the output
+            # Download button for the report
             st.download_button(
-                label="Download Output",
-                data=generated_output,
-                file_name="personality_characters.txt",
-                mime="text/plain"
+                label="Download Report",
+                data=generated_report,
+                file_name="team_personality_report.md",
+                mime="text/markdown"
             )
