@@ -34,6 +34,7 @@ The sections are:
 - Use bullet points and tables where appropriate.
 - Ensure the content is specific to the provided team MBTI types and offers unique insights.
 - Avoid redundancy with previous sections!
+- CRITICAL: NEVER OUTPUT THE PHRASE 'MBTI,' USE 'TypeFinder' IN PLACE OF IT! 
 """
 
 # Define prompts for each section, incorporating your feedback
@@ -47,9 +48,9 @@ You are responsible for writing the **Team Profile** section of the report.
 
 **Section 1: Team Profile**
 
-- Begin by explaining each MBTI dichotomy (Extraversion vs. Introversion, Sensing vs. Intuition, Thinking vs. Feeling, Judging vs. Perceiving).
-- For each dichotomy, provide the count of team members who fall into each category (e.g., "There are X who are Introverted (I) and Y who are Extraverted (E)").
-- After covering all four dichotomies, present the overall team type based on the most common traits.
+- Begin by explaining each MBTI preference (Extraversion vs. Introversion, Sensing vs. Intuition, Thinking vs. Feeling, Judging vs. Perceiving).
+- For each preference, provide the count of team members who fall into each category (e.g., "There are X who are Introverted (I) and Y who are Extraverted (E)"), and subsequently, the 'team preference' for that specific dichotomy.
+- After covering all four dichotomies, present the overall 'team type' based on the most common traits (eg, INFJ, etc).
 - Provide an analysis of the overall team type, including key characteristics and how it influences team dynamics.
 - **Only use the MBTI types provided; do not introduce new types.**
 - Required length: Approximately 500 words.
@@ -114,7 +115,7 @@ You are responsible for writing the **Type Preference Breakdown** section of the
 - For each MBTI dimension (Extraversion vs. Introversion, Sensing vs. Intuition, Thinking vs. Feeling, Judging vs. Perceiving):
   - Calculate the team's percentage distribution based on the MBTI types of the team members provided.
   - Create a separate table for each dimension.
-  - Under each table, immediately provide a 200-word discussion of the implications of this specific distribution for workplace dynamics.
+  - Under each table, immediately provide a 200-word discussion of the implications of this specific distribution for workplace dynamics (no new header necessary).
 - Explain what these percentages mean for team communication, decision-making, and problem-solving.
 - Required length: Approximately 800 words.
 
@@ -136,7 +137,7 @@ You are responsible for writing the **Actions and Next Steps** section of the re
 - Provide actionable recommendations for team leaders to enhance collaboration and performance, based on the analysis in the previous sections and the specific MBTI types present in the team.
 - Structure the recommendations with subheadings for each area of action (e.g., "Facilitating Effective Communication", "Leveraging Team Strengths", "Addressing Potential Blind Spots", "Enhancing Personal Development", "Continuous Improvement").
 - Under each subheading, provide bullet points or numbered lists of specific actions.
-- Do not include any concluding filler text (e.g., avoid phrases like "By following these recommendations...").
+- Immediately end your outputs after the last bullet, do not include any concluding filler text after this (ie, NO filler concluding paragraph like "By following these recommendations...").
 - Required length: Approximately 450 words.
 
 **Conclude the report by adding your section below:**
