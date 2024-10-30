@@ -144,7 +144,7 @@ You are responsible for writing the **Actions and Next Steps** section of the re
 """
 }
 
-st.title('Team Personality Report Generator')
+st.title('Truity Team Report Generator')
 
 # Input for team size
 team_size = st.number_input('Enter the number of team members (up to 30)', min_value=1, max_value=30, value=5)
