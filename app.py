@@ -70,7 +70,7 @@ if st.button('Generate Report'):
             # Prepare the team types as a string
             team_types_str = ', '.join(team_mbti_types)
             # Initialize the LLM
-            chat_model = ChatOpenAI(openai_api_key=st.secrets['API_KEY'], model_name='gpt-4-1106-preview', temperature=0.2)
+            chat_model = ChatOpenAI(openai_api_key=st.secrets['API_KEY'], model_name='gpt-4o-2024-08-06', temperature=0.2)
             chat_chain = LLMChain(prompt=PromptTemplate.from_template(generate_team_report), llm=chat_model)
             generated_report = chat_chain.run(TEAM_TYPES=team_types_str)
             
