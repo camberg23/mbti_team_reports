@@ -27,7 +27,8 @@ You are an expert organizational psychologist specializing in team dynamics and 
 
 4. **Type Preference Breakdown:**
    - For each MBTI dimension (Extraversion vs. Introversion, Sensing vs. Intuition, Thinking vs. Feeling, Judging vs. Perceiving), calculate the team's percentage distribution.
-   - Explain what these percentages mean for team communication, decision-making, and problem-solving. Required length: 150 words
+   - Make a separate table for each, (eg, Dimension	Percentage Introversion (I)	80% Extraversion (E)	20%) followed by a 100-word discussion of the implications of this specific distribution for workplace dynamics.
+   - Explain what these percentages mean for team communication, decision-making, and problem-solving.
 
 5. **Actions and Next Steps:**
    - Provide actionable recommendations for team leaders to enhance collaboration and performance.
