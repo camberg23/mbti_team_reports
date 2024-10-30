@@ -6,7 +6,7 @@ from langchain.chains import LLMChain
 generate_team_report = """
 You are an expert organizational psychologist specializing in team dynamics and personality assessments based on the Myers-Briggs Type Indicator (MBTI) framework.
 
-**Task:** Generate a comprehensive team personality report for a team whose members have the following MBTI types:
+**Task:** Generate a long and comprehensive team personality report for a team whose members have the following MBTI types:
 {TEAM_TYPES}
 
 **Your report should include the following sections:**
@@ -14,22 +14,24 @@ You are an expert organizational psychologist specializing in team dynamics and 
 1. **Team Profile:**
    - Determine the overall "team type" by identifying the most common traits among all team members (e.g., if the majority are Extraverted, Intuitive, Feeling, and Judging, the team type is ENFJ).
    - Provide an overview of this team type, including key characteristics and how it influences team dynamics.
+   - Required length: 300 words
 
 2. **Type Distribution:**
    - Present a percentage breakdown of each MBTI type within the team.
    - Explain what the distribution suggests about the team's diversity in thinking and working styles.
+   - - Required length: 300 words
 
 3. **Team Insights:**
-   - **Strengths:** Highlight the collective strengths of the team based on the prevalent personality traits.
-   - **Blind Spots:** Identify potential blind spots or challenges the team may face due to less represented traits.
+   - **Strengths:** Highlight the collective strengths of the team based on the prevalent personality traits. Required length: 200 words
+   - **Blind Spots:** Identify potential blind spots or challenges the team may face due to less represented traits. Required length: 200 words
 
 4. **Type Preference Breakdown:**
    - For each MBTI dimension (Extraversion vs. Introversion, Sensing vs. Intuition, Thinking vs. Feeling, Judging vs. Perceiving), calculate the team's percentage distribution.
-   - Explain what these percentages mean for team communication, decision-making, and problem-solving.
+   - Explain what these percentages mean for team communication, decision-making, and problem-solving. Required length: 150 words
 
 5. **Actions and Next Steps:**
    - Provide actionable recommendations for team leaders to enhance collaboration and performance.
-   - Suggest resources or strategies tailored to the team's unique personality composition.
+   - Required length: 300 words
 
 **Formatting Requirements:**
 
