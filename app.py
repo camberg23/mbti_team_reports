@@ -36,7 +36,7 @@ The sections are:
 - Avoid redundancy with previous sections!
 """
 
-# Define prompts for each section, emphasizing the use of provided MBTI types
+# Define prompts for each section, incorporating your feedback
 prompts = {
     "Team Profile": """
 {INITIAL_CONTEXT}
@@ -47,8 +47,10 @@ You are responsible for writing the **Team Profile** section of the report.
 
 **Section 1: Team Profile**
 
-- Determine the overall "team type" by identifying the most common traits among the team members based on their MBTI types provided above.
-- Provide an overview of this team type, including key characteristics and how it influences team dynamics.
+- Begin by explaining each MBTI dichotomy (Extraversion vs. Introversion, Sensing vs. Intuition, Thinking vs. Feeling, Judging vs. Perceiving).
+- For each dichotomy, provide the count of team members who fall into each category (e.g., "There are X who are Introverted (I) and Y who are Extraverted (E)").
+- After covering all four dichotomies, present the overall team type based on the most common traits.
+- Provide an analysis of the overall team type, including key characteristics and how it influences team dynamics.
 - **Only use the MBTI types provided; do not introduce new types.**
 - Required length: Approximately 500 words.
 
@@ -67,9 +69,10 @@ You are responsible for writing the **Type Distribution** section of the report.
 
 **Section 2: Type Distribution**
 
-- Present a percentage breakdown of each MBTI type within the team (only include MBTI types present among the team members).
+- Begin with an **MBTI Type Breakdown**: Present a percentage breakdown of each MBTI type within the team (only include MBTI types present among the team members).
 - Ensure calculations are accurate based on the team size and MBTI types provided.
-- Explain what the distribution suggests about the team's diversity and similarity in thinking and working styles.
+- Include a section on **Team Similarity**: Discuss how similarities among team members might influence team cohesion and collaboration.
+- Include a section on **Team Diversity**: Discuss how differences among team members contribute to a variety of perspectives and skills within the team.
 - Required length: Approximately 500 words.
 
 **Continue the report by adding your section below:**
@@ -87,8 +90,11 @@ You are responsible for writing the **Team Insights** section of the report.
 
 **Section 3: Team Insights**
 
-- **Strengths:** Highlight the collective strengths of the team based on the prevalent personality traits present in the team. Required length: Approximately 350 words.
-- **Blind Spots:** Identify potential blind spots or challenges the team may face due to less represented traits within the team. Required length: Approximately 350 words.
+- Under the **Team Insights** header, create two subheadings: **Strengths** and **Potential Blind Spots**.
+- For **Strengths**, identify at least four strengths of the team. Each strength should be presented as a bolded sentence, followed by a paragraph expanding on it.
+- For **Potential Blind Spots**, identify at least four potential blind spots or challenges. Each should be presented as a bolded sentence, followed by a paragraph expanding on it.
+- Ensure that the strengths and blind spots are based on the prevalent and less represented personality traits present in the team.
+- Required length: Approximately 700 words total (350 words for strengths, 350 words for blind spots).
 
 **Continue the report by adding your section below:**
 """,
@@ -105,9 +111,12 @@ You are responsible for writing the **Type Preference Breakdown** section of the
 
 **Section 4: Type Preference Breakdown**
 
-- For each MBTI dimension (Extraversion vs. Introversion, Sensing vs. Intuition, Thinking vs. Feeling, Judging vs. Perceiving), calculate the team's percentage distribution based on the MBTI types of the team members provided.
-- Make a separate table for each dimension, followed by a 200-word discussion of the implications of this specific distribution for workplace dynamics.
+- For each MBTI dimension (Extraversion vs. Introversion, Sensing vs. Intuition, Thinking vs. Feeling, Judging vs. Perceiving):
+  - Calculate the team's percentage distribution based on the MBTI types of the team members provided.
+  - Create a separate table for each dimension.
+  - Under each table, immediately provide a 200-word discussion of the implications of this specific distribution for workplace dynamics.
 - Explain what these percentages mean for team communication, decision-making, and problem-solving.
+- Required length: Approximately 800 words.
 
 **Continue the report by adding your section below:**
 """,
@@ -125,6 +134,9 @@ You are responsible for writing the **Actions and Next Steps** section of the re
 **Section 5: Actions and Next Steps**
 
 - Provide actionable recommendations for team leaders to enhance collaboration and performance, based on the analysis in the previous sections and the specific MBTI types present in the team.
+- Structure the recommendations with subheadings for each area of action (e.g., "Facilitating Effective Communication", "Leveraging Team Strengths", "Addressing Potential Blind Spots", "Enhancing Personal Development", "Continuous Improvement").
+- Under each subheading, provide bullet points or numbered lists of specific actions.
+- Do not include any concluding filler text (e.g., avoid phrases like "By following these recommendations...").
 - Required length: Approximately 450 words.
 
 **Conclude the report by adding your section below:**
