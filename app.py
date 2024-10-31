@@ -44,6 +44,7 @@ The sections are:
 - Use bullet points and tables where appropriate.
 - Ensure the content is specific to the provided team TypeFinder types and offers unique insights.
 - Avoid redundancy with previous sections!
+- Round all percentages to nearest whole number (eg, 60%, not 60.0%)
 - CRITICAL: NEVER OUTPUT THE PHRASE 'MBTI,' USE 'TypeFinder' IN PLACE OF IT!
 """
 
