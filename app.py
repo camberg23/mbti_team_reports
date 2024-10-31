@@ -228,7 +228,7 @@ if st.button('Generate Report'):
 
             # Compute counts and percentages for types
             type_counts = Counter(team_typefinder_types)
-            type_percentages = {k: (v / total_members) * 100 for k, v in type_counts.items()}
+            type_percentages = {k: int((v / total_members) * 100) for k, v in type_counts.items()}
 
             # Prepare the preference breakdowns string
             preference_breakdowns = ""
