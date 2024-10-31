@@ -207,7 +207,7 @@ if st.button('Generate Report'):
             # Initialize the LLM
             chat_model = ChatOpenAI(
                 openai_api_key=st.secrets['API_KEY'], 
-                model_name='gpt-4-1106-preview', 
+                model_name='gpt-4o-2024-08-06', 
                 temperature=0.2
             )
             
