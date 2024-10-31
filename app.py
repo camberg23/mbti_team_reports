@@ -157,7 +157,7 @@ def randomize_types_callback():
     for i in range(int(st.session_state['team_size'])):
         key = f'mbti_{i}'
         st.session_state[key] = randomized_types[i]
-    st.rerun()
+    # st.rerun()
 
 # Initialize the 'team_size' in session_state if not present
 if 'team_size' not in st.session_state:
