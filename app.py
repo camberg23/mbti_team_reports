@@ -8,13 +8,24 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import io
 import base64
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image as ReportLabImage
-from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.platypus import (
+    SimpleDocTemplate,
+    Paragraph,
+    Spacer,
+    Image as ReportLabImage,
+    Table,
+    TableStyle,
+)
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.pagesizes import letter
-from reportlab.lib import utils
 from reportlab.lib.enums import TA_LEFT
+from reportlab.lib import colors
 from markdown2 import markdown
 from bs4 import BeautifulSoup
+
+# -------------------------------
+# Initial Context and Prompts
+# -------------------------------
 
 # Define the initial context shared across all LLM calls
 initial_context = """
@@ -59,7 +70,7 @@ The sections are:
 - CRITICAL: NEVER OUTPUT THE PHRASE 'MBTI,' USE 'TypeFinder' IN PLACE OF IT!
 """
 
-# Define prompts for each section, incorporating your feedback
+# Define prompts for each section
 prompts = {
     "Team Profile": """
 {INITIAL_CONTEXT}
@@ -168,26 +179,40 @@ You are responsible for writing the **Actions and Next Steps** section of the re
 """
 }
 
-# Define the list of TypeFinder types
-typefinder_types = ['INTJ', 'INTP', 'ENTJ', 'ENTP',
-                    'INFJ', 'INFP', 'ENFJ', 'ENFP',
-                    'ISTJ', 'ISFJ', 'ESTJ', 'ESFJ',
-                    'ISTP', 'ISFP', 'ESTP', 'ESFP']
+# -------------------------------
+# TypeFinder Types
+# -------------------------------
 
-# Function to randomize TypeFinder types and trigger a rerun
+typefinder_types = [
+    'INTJ', 'INTP', 'ENTJ', 'ENTP',
+    'INFJ', 'INFP', 'ENFJ', 'ENFP',
+    'ISTJ', 'ISFJ', 'ESTJ', 'ESFJ',
+    'ISTP', 'ISFP', 'ESTP', 'ESFP'
+]
+
+# -------------------------------
+# Callback Function
+# -------------------------------
+
 def randomize_types_callback():
     randomized_types = [random.choice(typefinder_types) for _ in range(int(st.session_state['team_size']))]
     for i in range(int(st.session_state['team_size'])):
         key = f'mbti_{i}'
         st.session_state[key] = randomized_types[i]
 
+# -------------------------------
+# Streamlit App Layout
+# -------------------------------
+
 # Initialize the 'team_size' in session_state if not present
 if 'team_size' not in st.session_state:
     st.session_state['team_size'] = 5
 
 # Input for team size
-team_size = st.number_input('Enter the number of team members (up to 30)', 
-                            min_value=1, max_value=30, value=5, key='team_size')
+team_size = st.number_input(
+    'Enter the number of team members (up to 30)', 
+    min_value=1, max_value=30, value=5, key='team_size'
+)
 
 # Add a button to randomize TypeFinder types
 st.button('Randomize Types', on_click=randomize_types_callback)
@@ -223,9 +248,13 @@ if st.button('Generate Report'):
         with st.spinner('Generating report, please wait...'):
             # Prepare the team types as a string
             team_types_str = ', '.join(team_typefinder_types)
+            
             # Prepare the team members list
-            team_members_list = "\n".join([f"{i+1}. Team Member {i+1}: {mbti_type}" 
-                                           for i, mbti_type in enumerate(team_typefinder_types)])
+            team_members_list = "\n".join([
+                f"{i+1}. Team Member {i+1}: {mbti_type}" 
+                for i, mbti_type in enumerate(team_typefinder_types)
+            ])
+            
             # Compute counts and percentages for preferences
             preference_counts = {'E': 0, 'I': 0, 'S': 0, 'N': 0, 'T': 0, 'F': 0, 'J': 0, 'P': 0}
             for t in team_typefinder_types:
@@ -235,7 +264,7 @@ if st.button('Generate Report'):
                     preference_counts[t[2]] += 1  # T or F
                     preference_counts[t[3]] += 1  # J or P
             total_members = len(team_typefinder_types)
-            preference_percentages = {k: (v / total_members) * 100 for k, v in preference_counts.items()}
+            preference_percentages = {k: round((v / total_members) * 100) for k, v in preference_counts.items()}
 
             # Compute counts and percentages for types
             type_counts = Counter(team_typefinder_types)
@@ -249,14 +278,14 @@ if st.button('Generate Report'):
                 perc1 = preference_percentages[dichotomy[0]]
                 perc2 = preference_percentages[dichotomy[1]]
                 preference_breakdowns += f"**{dichotomy[0]} vs {dichotomy[1]}**\n"
-                preference_breakdowns += f"- {dichotomy[0]}: {count1} members ({perc1:.1f}%)\n"
-                preference_breakdowns += f"- {dichotomy[1]}: {count2} members ({perc2:.1f}%)\n\n"
+                preference_breakdowns += f"- {dichotomy[0]}: {count1} members ({perc1}%)\n"
+                preference_breakdowns += f"- {dichotomy[1]}: {count2} members ({perc2}%)\n\n"
 
             # Prepare the type breakdowns string
             type_breakdowns = "**TypeFinder Type Breakdown**\n"
             for t, count in type_counts.items():
                 perc = type_percentages[t]
-                type_breakdowns += f"- {t}: {count} members ({perc:.1f}%)\n"
+                type_breakdowns += f"- {t}: {count} members ({perc}%)\n"
 
             # Generate plots
             plots = {}
@@ -271,7 +300,7 @@ if st.button('Generate Report'):
             plt.tight_layout()
             plt.savefig(buf, format='png')
             buf.seek(0)
-            type_distribution_plot = base64.b64encode(buf.getvalue()).decode('utf-8')
+            type_distribution_plot = buf.getvalue()
             plots['type_distribution'] = type_distribution_plot
             plt.close()
 
@@ -281,12 +310,18 @@ if st.button('Generate Report'):
                 labels = [dichotomy[0], dichotomy[1]]
                 sizes = [preference_counts[dichotomy[0]], preference_counts[dichotomy[1]]]
                 plt.figure(figsize=(6, 6))
-                plt.pie(sizes, labels=labels, autopct='%1.1f%%', startangle=90, colors=sns.color_palette('pastel'))
+                plt.pie(
+                    sizes, 
+                    labels=labels, 
+                    autopct='%1.1f%%', 
+                    startangle=90, 
+                    colors=sns.color_palette('pastel')
+                )
                 plt.title(f'{dichotomy[0]} vs {dichotomy[1]} Preference Distribution')
                 buf = io.BytesIO()
                 plt.savefig(buf, format='png')
                 buf.seek(0)
-                plot_data = base64.b64encode(buf.getvalue()).decode('utf-8')
+                plot_data = buf.getvalue()
                 preference_plots[''.join(dichotomy)] = plot_data
                 plt.close()
 
@@ -308,10 +343,16 @@ if st.button('Generate Report'):
             )
 
             # Initialize variables to store the report
-            report_sections = []
+            report_sections = {}
             report_so_far = ""
             # Iterate over each section
-            for section_name in ["Team Profile", "Type Distribution", "Team Insights", "Type Preference Breakdown", "Actions and Next Steps"]:
+            for section_name in [
+                "Team Profile", 
+                "Type Distribution", 
+                "Team Insights", 
+                "Type Preference Breakdown", 
+                "Actions and Next Steps"
+            ]:
                 # Prepare the prompt
                 prompt_template = PromptTemplate.from_template(prompts[section_name])
                 # Prepare the variables for the prompt
@@ -323,84 +364,138 @@ if st.button('Generate Report'):
                 chat_chain = LLMChain(prompt=prompt_template, llm=chat_model)
                 # Generate the section
                 section_text = chat_chain.run(**prompt_variables)
-                # Append the section to the report
-                report_sections.append(section_text.strip())
+                # Store the section
+                report_sections[section_name] = section_text.strip()
                 # Update the report so far
                 report_so_far += f"\n\n{section_text.strip()}"
 
             # Combine all sections into the final report
-            final_report = "\n\n".join(report_sections)
-
-            # Insert plots into the report
-            # We'll place the Type Distribution plot after Section 2
-            # And the preference plots after Section 4
-            report_with_images = final_report.split('\n\n')
-
-            # Insert Type Distribution plot after Section 2
-            for i, section in enumerate(report_with_images):
-                if 'Section 2: Type Distribution' in section:
-                    image_markdown = f"![Type Distribution](data:image/png;base64,{plots['type_distribution']})"
-                    report_with_images.insert(i + 1, image_markdown)
-                    break
-
-            # Insert preference plots after Section 4
-            for i, section in enumerate(report_with_images):
-                if 'Section 4: Type Preference Breakdown' in section:
-                    for dichotomy in [('E', 'I'), ('S', 'N'), ('T', 'F'), ('J', 'P')]:
-                        key = ''.join(dichotomy)
-                        image_markdown = f"![{dichotomy[0]} vs {dichotomy[1]}](data:image/png;base64,{preference_plots[key]})"
-                        report_with_images.insert(i + 1, image_markdown)
-                    break
-
-            # Reassemble the report
-            final_report_with_images = '\n\n'.join(report_with_images)
+            final_report = "\n\n".join([
+                report_sections["Team Profile"],
+                report_sections["Type Distribution"],
+                report_sections["Team Insights"],
+                report_sections["Type Preference Breakdown"],
+                report_sections["Actions and Next Steps"]
+            ])
 
             # Display the report using markdown
-            st.markdown(final_report_with_images, unsafe_allow_html=True)
+            st.markdown(final_report)
 
-            # Function to convert markdown to PDF
-            def convert_markdown_to_pdf(md_content):
-                # Convert markdown to HTML
-                html = markdown(md_content)
+            # Display the plots in Streamlit
+            # Insert Type Distribution plot after Section 2
+            st.header("Type Distribution Plot")
+            st.image(plots['type_distribution'], use_column_width=True)
 
-                # Parse the HTML and extract text and images
-                soup = BeautifulSoup(html, 'html.parser')
+            # Insert preference plots after Section 4
+            for dichotomy in [('E', 'I'), ('S', 'N'), ('T', 'F'), ('J', 'P')]:
+                key = ''.join(dichotomy)
+                st.header(f"{dichotomy[0]} vs {dichotomy[1]} Preference Distribution")
+                st.image(preference_plots[key], use_column_width=True)
 
+            # -------------------------------
+            # PDF Generation Function
+            # -------------------------------
+
+            def convert_markdown_to_pdf(report_sections_dict, plots_dict, preference_plots_dict):
+                # Initialize PDF document
+                pdf_buffer = io.BytesIO()
+                doc = SimpleDocTemplate(pdf_buffer, pagesize=letter)
                 elements = []
                 styles = getSampleStyleSheet()
                 styleN = styles['Normal']
-                styleH = styles['Heading1']
-                styleN.alignment = TA_LEFT
+                styleH2 = styles['Heading2']
+                styleH3 = styles['Heading3']
+                styleH2.alignment = TA_LEFT
+                styleH3.alignment = TA_LEFT
 
-                for elem in soup.contents:
-                    if elem.name == 'h1':
-                        elements.append(Paragraph(elem.text, styleH))
-                    elif elem.name == 'p':
-                        elements.append(Paragraph(elem.text, styleN))
-                    elif elem.name == 'img':
-                        img_data = elem['src'].split(',')[1]
-                        img = base64.b64decode(img_data)
-                        img_buffer = io.BytesIO(img)
-                        img_obj = utils.ImageReader(img_buffer)
-                        iw, ih = img_obj.getSize()
-                        aspect = ih / float(iw)
-                        img_width = 400
-                        img_height = img_width * aspect
-                        elements.append(ReportLabImage(img_buffer, width=img_width, height=img_height))
-                    elif elem.name == 'ul':
-                        for li in elem.find_all('li'):
-                            elements.append(Paragraph('• ' + li.text, styleN))
-                    elements.append(Spacer(1, 12))
+                # Helper function to detect if a string is a markdown table
+                def is_markdown_table(text):
+                    lines = text.split('\n')
+                    if len(lines) < 2:
+                        return False
+                    if not all(['|' in line for line in lines[:2]]):
+                        return False
+                    return True
+
+                # Helper function to parse a markdown table into list of lists
+                def parse_markdown_table(text):
+                    lines = text.strip().split('\n')
+                    table = []
+                    for line in lines:
+                        # Remove leading and trailing |
+                        line = line.strip().strip('|')
+                        # Split by | and strip spaces
+                        cols = [col.strip() for col in line.split('|')]
+                        table.append(cols)
+                    return table
+
+                # Add each section and corresponding plots
+                for section_name in [
+                    "Team Profile", 
+                    "Type Distribution", 
+                    "Team Insights", 
+                    "Type Preference Breakdown", 
+                    "Actions and Next Steps"
+                ]:
+                    # Add the section text
+                    section_text = report_sections_dict[section_name]
+                    paragraphs = section_text.split('\n\n')
+                    for para in paragraphs:
+                        if para.startswith("**") and para.endswith("**"):
+                            # It's a heading
+                            clean_text = para.strip("*")
+                            p = Paragraph(clean_text, styleH2)
+                            elements.append(p)
+                        elif is_markdown_table(para):
+                            # It's a table
+                            table_data = parse_markdown_table(para)
+                            t = Table(table_data, hAlign='LEFT')
+                            t.setStyle(TableStyle([
+                                ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+                                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                                ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+                                ('GRID', (0,0), (-1,-1), 1, colors.black),
+                            ]))
+                            elements.append(t)
+                            elements.append(Spacer(1, 12))
+                        else:
+                            # It's a normal paragraph
+                            p = Paragraph(para, styleN)
+                            elements.append(p)
+                            elements.append(Spacer(1, 12))
+                    
+                    # After specific sections, add plots
+                    if section_name == "Type Distribution":
+                        # Add Type Distribution plot
+                        elements.append(Spacer(1, 12))
+                        img_buffer = io.BytesIO(plots_dict['type_distribution'])
+                        img = ReportLabImage(img_buffer, width=400, height=240)  # Adjust size as needed
+                        elements.append(img)
+                        elements.append(Spacer(1, 12))
+                    if section_name == "Type Preference Breakdown":
+                        # Add preference plots
+                        for dichotomy in [('E', 'I'), ('S', 'N'), ('T', 'F'), ('J', 'P')]:
+                            key = ''.join(dichotomy)
+                            elements.append(Spacer(1, 12))
+                            img_buffer = io.BytesIO(preference_plots_dict[key])
+                            img = ReportLabImage(img_buffer, width=300, height=300)  # Adjust size as needed
+                            elements.append(Paragraph(f"{dichotomy[0]} vs {dichotomy[1]} Preference Distribution", styleH3))
+                            elements.append(img)
+                            elements.append(Spacer(1, 12))
 
                 # Build PDF
-                pdf_buffer = io.BytesIO()
-                doc = SimpleDocTemplate(pdf_buffer, pagesize=letter)
                 doc.build(elements)
                 pdf_buffer.seek(0)
                 return pdf_buffer
 
+            # -------------------------------
+            # Generate PDF
+            # -------------------------------
+
             # Convert the report to PDF
-            pdf_data = convert_markdown_to_pdf(final_report_with_images)
+            pdf_data = convert_markdown_to_pdf(report_sections, plots, preference_plots)
 
             # Download button for the report
             st.download_button(
@@ -409,6 +504,7 @@ if st.button('Generate Report'):
                 file_name="team_personality_report.pdf",
                 mime="application/pdf"
             )
+
 
 
 # import streamlit as st
