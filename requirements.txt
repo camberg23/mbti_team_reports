@@ -1,4 +1,10 @@
-openai
 streamlit
 langchain==0.1.7
 langchain-community==0.0.20
+openai
+matplotlib
+seaborn
+reportlab
+markdown2
+beautifulsoup4
+pillow
