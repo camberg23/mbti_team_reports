@@ -7,7 +7,6 @@ from collections import Counter
 import matplotlib.pyplot as plt
 import seaborn as sns
 import io
-import base64
 from reportlab.platypus import (
     SimpleDocTemplate,
     Paragraph,
@@ -288,16 +287,23 @@ if st.button('Generate Report'):
                 type_breakdowns += f"- {t}: {count} members ({perc}%)\n"
 
             # Generate plots
+            sns.set_style('whitegrid')  # Improve plot aesthetics
+            plt.rcParams.update({'font.family': 'serif'})  # Set plot fonts to serif
+
             plots = {}
             # Plot for TypeFinder Type Distribution
             plt.figure(figsize=(10, 6))
-            sns.barplot(x=list(type_counts.keys()), y=list(type_counts.values()), palette='viridis')
-            plt.title('TypeFinder Type Distribution')
-            plt.xlabel('TypeFinder Types')
-            plt.ylabel('Number of Team Members')
+            sns.barplot(
+                x=list(type_counts.keys()), 
+                y=list(type_counts.values()), 
+                palette='viridis'
+            )
+            plt.title('TypeFinder Type Distribution', fontsize=16)
+            plt.xlabel('TypeFinder Types', fontsize=14)
+            plt.ylabel('Number of Team Members', fontsize=14)
             plt.xticks(rotation=45)
-            buf = io.BytesIO()
             plt.tight_layout()
+            buf = io.BytesIO()
             plt.savefig(buf, format='png')
             buf.seek(0)
             type_distribution_plot = buf.getvalue()
@@ -315,9 +321,11 @@ if st.button('Generate Report'):
                     labels=labels, 
                     autopct='%1.1f%%', 
                     startangle=90, 
-                    colors=sns.color_palette('pastel')
+                    colors=sns.color_palette('pastel'),
+                    textprops={'fontsize': 12, 'fontfamily': 'serif'}
                 )
-                plt.title(f'{dichotomy[0]} vs {dichotomy[1]} Preference Distribution')
+                plt.title(f'{dichotomy[0]} vs {dichotomy[1]} Preference Distribution', fontsize=14)
+                plt.tight_layout()
                 buf = io.BytesIO()
                 plt.savefig(buf, format='png')
                 buf.seek(0)
@@ -378,19 +386,25 @@ if st.button('Generate Report'):
                 report_sections["Actions and Next Steps"]
             ])
 
-            # Display the report using markdown
-            st.markdown(final_report)
-
-            # Display the plots in Streamlit
-            # Insert Type Distribution plot after Section 2
-            st.header("Type Distribution Plot")
-            st.image(plots['type_distribution'], use_column_width=True)
-
-            # Insert preference plots after Section 4
-            for dichotomy in [('E', 'I'), ('S', 'N'), ('T', 'F'), ('J', 'P')]:
-                key = ''.join(dichotomy)
-                st.header(f"{dichotomy[0]} vs {dichotomy[1]} Preference Distribution")
-                st.image(preference_plots[key], use_column_width=True)
+            # Display the report sections and intersperse plots
+            for section_name in [
+                "Team Profile", 
+                "Type Distribution", 
+                "Team Insights", 
+                "Type Preference Breakdown", 
+                "Actions and Next Steps"
+            ]:
+                st.markdown(report_sections[section_name])
+                if section_name == "Type Distribution":
+                    # Display Type Distribution plot
+                    st.header("Type Distribution Plot")
+                    st.image(plots['type_distribution'], use_column_width=True)
+                if section_name == "Type Preference Breakdown":
+                    # Display preference plots
+                    for dichotomy in [('E', 'I'), ('S', 'N'), ('T', 'F'), ('J', 'P')]:
+                        key = ''.join(dichotomy)
+                        st.header(f"{dichotomy[0]} vs {dichotomy[1]} Preference Distribution")
+                        st.image(preference_plots[key], use_column_width=True)
 
             # -------------------------------
             # PDF Generation Function
@@ -402,32 +416,81 @@ if st.button('Generate Report'):
                 doc = SimpleDocTemplate(pdf_buffer, pagesize=letter)
                 elements = []
                 styles = getSampleStyleSheet()
-                styleN = styles['Normal']
-                styleH2 = styles['Heading2']
-                styleH3 = styles['Heading3']
-                styleH2.alignment = TA_LEFT
-                styleH3.alignment = TA_LEFT
+                
+                # Define a serif font style
+                styleN = ParagraphStyle(
+                    'Normal',
+                    parent=styles['Normal'],
+                    fontName='Times-Roman',
+                    fontSize=12,
+                    leading=14,
+                )
+                styleH = ParagraphStyle(
+                    'Heading',
+                    parent=styles['Heading1'],
+                    fontName='Times-Bold',
+                    fontSize=18,
+                    leading=22,
+                    spaceAfter=10,
+                )
+                styleB = ParagraphStyle(
+                    'Body',
+                    parent=styles['BodyText'],
+                    fontName='Times-Roman',
+                    fontSize=12,
+                    leading=14,
+                )
+                styleList = ParagraphStyle(
+                    'List',
+                    parent=styles['Normal'],
+                    fontName='Times-Roman',
+                    fontSize=12,
+                    leading=14,
+                    leftIndent=20,
+                )
+                
+                from markdown2 import markdown
+                from bs4 import BeautifulSoup
 
-                # Helper function to detect if a string is a markdown table
-                def is_markdown_table(text):
-                    lines = text.split('\n')
-                    if len(lines) < 2:
-                        return False
-                    if not all(['|' in line for line in lines[:2]]):
-                        return False
-                    return True
-
-                # Helper function to parse a markdown table into list of lists
-                def parse_markdown_table(text):
-                    lines = text.strip().split('\n')
-                    table = []
-                    for line in lines:
-                        # Remove leading and trailing |
-                        line = line.strip().strip('|')
-                        # Split by | and strip spaces
-                        cols = [col.strip() for col in line.split('|')]
-                        table.append(cols)
-                    return table
+                def process_markdown(text):
+                    html = markdown(text)
+                    soup = BeautifulSoup(html, 'html.parser')
+                    for elem in soup:
+                        if elem.name in ['h1', 'h2', 'h3']:
+                            elements.append(Paragraph(elem.text, styleH))
+                        elif elem.name == 'p':
+                            elements.append(Paragraph(elem.decode_contents(), styleN))
+                        elif elem.name == 'ul':
+                            for li in elem.find_all('li'):
+                                elements.append(Paragraph('• ' + li.text, styleList))
+                        elif elem.name == 'strong':
+                            elements.append(Paragraph('<b>%s</b>' % elem.text, styleN))
+                        elif elem.name == 'table':
+                            # Parse table
+                            table_data = []
+                            rows = elem.find_all('tr')
+                            for row in rows:
+                                cols = row.find_all(['td', 'th'])
+                                table_row = [col.text.strip() for col in cols]
+                                # Skip separator rows
+                                if set(table_row) == {'---'}:
+                                    continue
+                                table_data.append(table_row)
+                            if table_data:
+                                t = Table(table_data, hAlign='LEFT')
+                                t.setStyle(TableStyle([
+                                    ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+                                    ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                                    ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                                    ('FONTNAME', (0, 0), (-1, 0), 'Times-Bold'),
+                                    ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+                                    ('GRID', (0,0), (-1,-1), 1, colors.black),
+                                ]))
+                                elements.append(t)
+                                elements.append(Spacer(1, 12))
+                        else:
+                            elements.append(Paragraph(elem.text, styleN))
+                        elements.append(Spacer(1, 12))
 
                 # Add each section and corresponding plots
                 for section_name in [
@@ -439,32 +502,7 @@ if st.button('Generate Report'):
                 ]:
                     # Add the section text
                     section_text = report_sections_dict[section_name]
-                    paragraphs = section_text.split('\n\n')
-                    for para in paragraphs:
-                        if para.startswith("**") and para.endswith("**"):
-                            # It's a heading
-                            clean_text = para.strip("*")
-                            p = Paragraph(clean_text, styleH2)
-                            elements.append(p)
-                        elif is_markdown_table(para):
-                            # It's a table
-                            table_data = parse_markdown_table(para)
-                            t = Table(table_data, hAlign='LEFT')
-                            t.setStyle(TableStyle([
-                                ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
-                                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-                                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-                                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-                                ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-                                ('GRID', (0,0), (-1,-1), 1, colors.black),
-                            ]))
-                            elements.append(t)
-                            elements.append(Spacer(1, 12))
-                        else:
-                            # It's a normal paragraph
-                            p = Paragraph(para, styleN)
-                            elements.append(p)
-                            elements.append(Spacer(1, 12))
+                    process_markdown(section_text)
                     
                     # After specific sections, add plots
                     if section_name == "Type Distribution":
@@ -480,8 +518,8 @@ if st.button('Generate Report'):
                             key = ''.join(dichotomy)
                             elements.append(Spacer(1, 12))
                             img_buffer = io.BytesIO(preference_plots_dict[key])
+                            elements.append(Paragraph(f"{dichotomy[0]} vs {dichotomy[1]} Preference Distribution", styleH))
                             img = ReportLabImage(img_buffer, width=300, height=300)  # Adjust size as needed
-                            elements.append(Paragraph(f"{dichotomy[0]} vs {dichotomy[1]} Preference Distribution", styleH3))
                             elements.append(img)
                             elements.append(Spacer(1, 12))
 
@@ -504,7 +542,6 @@ if st.button('Generate Report'):
                 file_name="team_personality_report.pdf",
                 mime="application/pdf"
             )
-
 
 
 # import streamlit as st
