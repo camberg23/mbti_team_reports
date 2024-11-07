@@ -473,7 +473,7 @@ if st.button('Generate Report'):
                                 cols = row.find_all(['td', 'th'])
                                 table_row = [col.text.strip() for col in cols]
                                 # Skip separator rows
-                                if set(table_row) == {'---'}:
+                                if all(cell.strip().replace('-', '').replace(':', '') == '' for cell in table_row):
                                     continue
                                 table_data.append(table_row)
                             if table_data:
