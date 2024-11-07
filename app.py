@@ -446,7 +446,7 @@ if st.button('Generate Report'):
                 from bs4 import BeautifulSoup
             
                 def process_markdown(text):
-                    html = markdown(text)
+                    html = markdown(text, extras=['tables'])
                     soup = BeautifulSoup(html, 'html.parser')
                     for elem in soup.contents:
                         if isinstance(elem, str):
