@@ -324,7 +324,7 @@ if st.button('Generate Report'):
                     colors=sns.color_palette('pastel'),
                     textprops={'fontsize': 12, 'fontfamily': 'serif'}
                 )
-                plt.title(f'{dichotomy[0]} vs {dichotomy[1]} Preference Distribution', fontsize=14)
+                # plt.title(f'{dichotomy[0]} vs {dichotomy[1]} Preference Distribution', fontsize=14)
                 plt.tight_layout()
                 buf = io.BytesIO()
                 plt.savefig(buf, format='png')
@@ -448,26 +448,29 @@ if st.button('Generate Report'):
                 def process_markdown(text):
                     html = markdown(text)
                     soup = BeautifulSoup(html, 'html.parser')
-                    for elem in soup:
-                        if elem.name in ['h1', 'h2', 'h3']:
-                            elements.append(Paragraph(elem.text, styleH))
-                        elif elem.name == 'p':
-                            elements.append(Paragraph(elem.decode_contents(), styleN))
-                        elif elem.name == 'ul':
-                            for li in elem.find_all('li'):
-                                elements.append(Paragraph('• ' + li.text, styleList))
-                        elif elem.name == 'strong':
-                            elements.append(Paragraph('<b>%s</b>' % elem.text, styleN))
-                        elif elem.name == 'table':
-                            # Parse table
+                    for elem in soup.contents:
+                        if isinstance(elem, str):
+                            continue  # Skip strings like newlines
+                        if elem.name == 'table':
+                            # Handle table
                             table_data = []
-                            rows = elem.find_all('tr')
+                            # Handle table header
+                            thead = elem.find('thead')
+                            if thead:
+                                header_row = []
+                                for th in thead.find_all('th'):
+                                    header_row.append(th.get_text(strip=True))
+                                if header_row:
+                                    table_data.append(header_row)
+                            # Handle table body
+                            tbody = elem.find('tbody')
+                            if tbody:
+                                rows = tbody.find_all('tr')
+                            else:
+                                rows = elem.find_all('tr')
                             for row in rows:
                                 cols = row.find_all(['td', 'th'])
-                                table_row = [col.text.strip() for col in cols]
-                                # **Updated Condition to Skip Separator Rows**
-                                if all(all(char in '-:' for char in cell.strip()) for cell in table_row):
-                                    continue  # Skip the separator row
+                                table_row = [col.get_text(strip=True) for col in cols]
                                 table_data.append(table_row)
                             if table_data:
                                 t = Table(table_data, hAlign='LEFT')
@@ -476,13 +479,26 @@ if st.button('Generate Report'):
                                     ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
                                     ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
                                     ('FONTNAME', (0, 0), (-1, 0), 'Times-Bold'),
+                                    ('FONTNAME', (0, 1), (-1, -1), 'Times-Roman'),
                                     ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-                                    ('GRID', (0,0), (-1,-1), 1, colors.black),
+                                    ('GRID', (0, 0), (-1, -1), 1, colors.black),
                                 ]))
                                 elements.append(t)
                                 elements.append(Spacer(1, 12))
-                        elements.append(Spacer(1, 12))
-            
+                        elif elem.name in ['h1', 'h2', 'h3']:
+                            elements.append(Paragraph(elem.text, styleH))
+                            elements.append(Spacer(1, 12))
+                        elif elem.name == 'p':
+                            elements.append(Paragraph(elem.decode_contents(), styleN))
+                            elements.append(Spacer(1, 12))
+                        elif elem.name == 'ul':
+                            for li in elem.find_all('li', recursive=False):
+                                elements.append(Paragraph('• ' + li.text, styleList))
+                                elements.append(Spacer(1, 12))
+                        else:
+                            elements.append(Paragraph(elem.get_text(strip=True), styleN))
+                            elements.append(Spacer(1, 12))
+
                 # Add each section and corresponding plots
                 for section_name in [
                     "Team Profile", 
