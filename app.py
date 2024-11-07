@@ -433,13 +433,6 @@ if st.button('Generate Report'):
                     leading=22,
                     spaceAfter=10,
                 )
-                styleB = ParagraphStyle(
-                    'Body',
-                    parent=styles['BodyText'],
-                    fontName='Times-Roman',
-                    fontSize=12,
-                    leading=14,
-                )
                 styleList = ParagraphStyle(
                     'List',
                     parent=styles['Normal'],
@@ -451,7 +444,7 @@ if st.button('Generate Report'):
                 
                 from markdown2 import markdown
                 from bs4 import BeautifulSoup
-
+            
                 def process_markdown(text):
                     html = markdown(text)
                     soup = BeautifulSoup(html, 'html.parser')
@@ -472,9 +465,9 @@ if st.button('Generate Report'):
                             for row in rows:
                                 cols = row.find_all(['td', 'th'])
                                 table_row = [col.text.strip() for col in cols]
-                                # Skip separator rows
-                                if all(cell.strip().replace('-', '').replace(':', '') == '' for cell in table_row):
-                                    continue
+                                # **Updated Condition to Skip Separator Rows**
+                                if all(all(char in '-:' for char in cell.strip()) for cell in table_row):
+                                    continue  # Skip the separator row
                                 table_data.append(table_row)
                             if table_data:
                                 t = Table(table_data, hAlign='LEFT')
@@ -488,10 +481,8 @@ if st.button('Generate Report'):
                                 ]))
                                 elements.append(t)
                                 elements.append(Spacer(1, 12))
-                        else:
-                            elements.append(Paragraph(elem.text, styleN))
                         elements.append(Spacer(1, 12))
-
+            
                 # Add each section and corresponding plots
                 for section_name in [
                     "Team Profile", 
@@ -522,11 +513,12 @@ if st.button('Generate Report'):
                             img = ReportLabImage(img_buffer, width=300, height=300)  # Adjust size as needed
                             elements.append(img)
                             elements.append(Spacer(1, 12))
-
+            
                 # Build PDF
                 doc.build(elements)
                 pdf_buffer.seek(0)
                 return pdf_buffer
+
 
             # -------------------------------
             # Generate PDF
