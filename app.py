@@ -40,7 +40,7 @@ def randomize_types_callback():
         st.session_state[key] = randomized_types[i]
 
 # -----------------------------------------------------------------------------------
-# Updated Prompts (Intro + Type Distribution as one)
+# Updated Prompts (Intro + Type Distribution combined)
 # -----------------------------------------------------------------------------------
 
 initial_context = """
@@ -82,8 +82,12 @@ Follow these guidelines:
 """
 
 prompts = {
+    # We add a {NOT_ON_TEAM_LIST} marker here so we can pass absent types to the LLM:
     "Intro_and_Type_Distribution": """
 {INITIAL_CONTEXT}
+
+**Types Not on the Team:**
+{NOT_ON_TEAM_LIST}
 
 **Your Role:**
 
@@ -98,7 +102,7 @@ Write **Section 1: Intro & Type Distribution** as a single combined section.
 2. **Type Distribution**  
    - Present the percentages for each TypeFinder type (ISTJ, ENFP, etc.) based on the provided data.
    - Under a subheading `### Types on the Team`, list each type present (with short bullet points describing it, plus count & %).
-   - Under a subheading `### Types Not on the Team`, list absent types (count=0, 0%).
+   - Under a subheading `### Types Not on the Team`, incorporate the data above (count=0, 0%).
    - Briefly discuss how certain distributions might affect communication/decision-making.
 
 - Approximately 600 words total.
@@ -257,6 +261,15 @@ if st.button('Generate Report'):
                 for k, v in type_counts.items()
             }
             
+            # Identify absent types
+            absent_types = [t for t in typefinder_types if t not in type_counts]
+            not_on_team_list_str = ""
+            if absent_types:
+                for t in absent_types:
+                    not_on_team_list_str += f"- {t} (0%)\n"
+            else:
+                not_on_team_list_str = "None (All Types Represented)"
+
             # Build a type breakdown string
             type_breakdowns = ""
             for t, c in type_counts.items():
@@ -339,11 +352,21 @@ if st.button('Generate Report'):
             ]
 
             for section_name in section_names:
-                prompt_template = PromptTemplate.from_template(prompts[section_name])
-                prompt_vars = {
-                    "INITIAL_CONTEXT": formatted_initial_context.strip(),
-                    "REPORT_SO_FAR": report_so_far.strip()
-                }
+                # If we're generating Intro + Distribution, pass in the list of absent types:
+                if section_name == "Intro_and_Type_Distribution":
+                    prompt_template = PromptTemplate.from_template(prompts[section_name])
+                    prompt_vars = {
+                        "INITIAL_CONTEXT": formatted_initial_context.strip(),
+                        "REPORT_SO_FAR": report_so_far.strip(),
+                        "NOT_ON_TEAM_LIST": not_on_team_list_str
+                    }
+                else:
+                    prompt_template = PromptTemplate.from_template(prompts[section_name])
+                    prompt_vars = {
+                        "INITIAL_CONTEXT": formatted_initial_context.strip(),
+                        "REPORT_SO_FAR": report_so_far.strip()
+                    }
+
                 from langchain.chains import LLMChain
                 chain = LLMChain(prompt=prompt_template, llm=chat_model)
                 section_text = chain.run(**prompt_vars)
@@ -423,11 +446,11 @@ if st.button('Generate Report'):
                 )
 
                 from markdown2 import markdown
-                from bs4 import BeautifulSoup
+                soup_maker = BeautifulSoup
 
                 def process_markdown(md_text):
                     html = markdown(md_text, extras=['tables'])
-                    soup = BeautifulSoup(html, 'html.parser')
+                    soup = soup_maker(html, 'html.parser')
                     for elem in soup.contents:
                         if isinstance(elem, str):
                             continue
@@ -486,6 +509,7 @@ if st.button('Generate Report'):
                             for li in elem.find_all('li', recursive=False):
                                 elements.append(Paragraph('• ' + li.text, styleList))
                                 elements.append(Spacer(1,6))
+
                         else:
                             # Fallback for other tags
                             elements.append(Paragraph(elem.get_text(strip=True), styleN))
