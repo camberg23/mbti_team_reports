@@ -23,7 +23,7 @@ from markdown2 import markdown
 from bs4 import BeautifulSoup
 
 # -----------------------------------------------------------------------------------
-# TypeFinder Types (16 common variations)
+# TypeFinder Types (16 variations)
 # -----------------------------------------------------------------------------------
 typefinder_types = [
     'INTJ', 'INTP', 'ENTJ', 'ENTP',
@@ -33,13 +33,14 @@ typefinder_types = [
 ]
 
 def randomize_types_callback():
+    """Randomly assign TypeFinder types to each team member."""
     randomized_types = [random.choice(typefinder_types) for _ in range(int(st.session_state['team_size']))]
     for i in range(int(st.session_state['team_size'])):
         key = f'mbti_{i}'
         st.session_state[key] = randomized_types[i]
 
 # -----------------------------------------------------------------------------------
-# Updated Prompts (Simplified Introduction)
+# Updated Prompts (Intro + Type Distribution as one)
 # -----------------------------------------------------------------------------------
 
 initial_context = """
@@ -66,57 +67,43 @@ We use “dimension” to describe the four pairs, and “preference” only whe
 {TYPE_BREAKDOWNS}
 
 Your goal:
-Create a comprehensive team report with these sections:
+Create a comprehensive team report with the following sections:
 
-1. Introduction  
-2. Analysis of Type Distribution  
-3. Analysis of Dimension Preferences  
-4. Team Insights  
-5. Next Steps  
+1. Intro & Type Distribution (combined)
+2. Analysis of Dimension Preferences
+3. Team Insights
+4. Next Steps
 
 Follow these guidelines:
-- Keep language short and clear.
-- Round percentages to the nearest whole number.
-- Never use "MBTI."
-- Maintain a professional, neutral tone.
+- Keep language short, clear, and professional.
+- Round all percentages to the nearest whole number.
+- Never use "MBTI" anywhere.
+- “Dimension” for the four pairs, “preference” only for one side of a dimension.
 """
 
 prompts = {
-    "Introduction": """
+    "Intro_and_Type_Distribution": """
 {INITIAL_CONTEXT}
 
 **Your Role:**
 
-Write **Section 1: Introduction** to the TypeFinder Team Report.
+Write **Section 1: Intro & Type Distribution** as a single combined section.
 
-## Section 1: Introduction
+## Section 1: Intro & Type Distribution
 
-- Provide a **short** introduction paragraph or two explaining the TypeFinder framework (the four dimensions).
-- Briefly state how understanding these types can help teams work more effectively.
-- ~200 words max.
+1. **Introduction (short)**  
+   - Briefly (1–2 paragraphs) explain the TypeFinder framework (the four dimensions).
+   - State how understanding these types helps teams collaborate effectively.
 
-**Begin your section below:**
-""",
-    "Analysis of Type Distribution": """
-{INITIAL_CONTEXT}
+2. **Type Distribution**  
+   - Present the percentages for each TypeFinder type (ISTJ, ENFP, etc.) based on the provided data.
+   - Under a subheading `### Types on the Team`, list each type present (with short bullet points describing it, plus count & %).
+   - Under a subheading `### Types Not on the Team`, list absent types (count=0, 0%).
+   - Briefly discuss how certain distributions might affect communication/decision-making.
 
-**Report So Far:**
+- Approximately 600 words total.
 
-{REPORT_SO_FAR}
-
-**Your Role:**
-
-Write **Section 2: Analysis of Type Distribution**.
-
-## Section 2: Analysis of Type Distribution
-
-- Present the percentages for each TypeFinder type (e.g., ISTJ, ENFP) from the provided data.
-- List the types **on the team** (with short bullet points describing each, plus count & %), from most common to least common.
-- List any types **not** on the team (0%, absent) with the same info.
-- Include a brief discussion of how certain distributions might affect communication and decision-making.
-- ~500 words.
-
-**Continue your report below:**
+**Begin your combined section below:**
 """,
     "Analysis of Dimension Preferences": """
 {INITIAL_CONTEXT}
@@ -127,14 +114,13 @@ Write **Section 2: Analysis of Type Distribution**.
 
 **Your Role:**
 
-Write **Section 3: Analysis of Dimension Preferences**.
+Write **Section 2: Analysis of Dimension Preferences**.
 
-## Section 3: Analysis of Dimension Preferences
+## Section 2: Analysis of Dimension Preferences
 
 - For each dimension (E vs I, S vs N, T vs F, J vs P):
   - Provide the counts/percentages for each preference (already in context).
-  - 1–2 paragraphs discussing how that preference split affects the team.
-- You may optionally mention a collective 'team type' if applicable.
+  - 1–2 paragraphs discussing how that preference split affects team collaboration and workflow.
 - ~600 words total.
 
 **Continue your report below:**
@@ -148,9 +134,9 @@ Write **Section 3: Analysis of Dimension Preferences**.
 
 **Your Role:**
 
-Write **Section 4: Team Insights**.
+Write **Section 3: Team Insights**.
 
-## Section 4: Team Insights
+## Section 3: Team Insights
 
 Use the following subheadings:
 
@@ -161,17 +147,17 @@ Use the following subheadings:
    - At least four potential challenges, same bolded format + paragraph.
 
 3. **Communication**  
-   - 1–2 paragraphs about dimension splits in communication.
+   - 1–2 paragraphs about how dimension splits influence communication patterns.
 
 4. **Teamwork**  
-   - 1–2 paragraphs about collaboration, synergy.
+   - 1–2 paragraphs about collaboration, synergy, workflow.
 
 5. **Conflict**  
-   - 1–2 paragraphs about friction points, resolution suggestions.
+   - 1–2 paragraphs about friction points and suggestions for healthy resolution.
 
 ~700 words total.
 
-**Continue your report below:**
+**Continue the report below:**
 """,
     "Next Steps": """
 {INITIAL_CONTEXT}
@@ -182,14 +168,14 @@ Use the following subheadings:
 
 **Your Role:**
 
-Write **Section 5: Next Steps**.
+Write **Section 4: Next Steps**.
 
-## Section 5: Next Steps
+## Section 4: Next Steps
 
-- Provide **actionable** recommendations for leveraging the TypeFinder composition.
-- Use subheadings (###) for each category of recommendations.
-- Bullet points or numbered lists with blank lines between items.
-- End right after the final bullet (no concluding paragraph).
+- Provide actionable recommendations for team leaders to leverage the TypeFinder composition.
+- Use subheadings (###) for each category.
+- Bullet points or numbered lists, with blank lines between items.
+- End immediately after the final bullet (no concluding paragraph).
 - ~400 words.
 
 **Conclude the report below:**
@@ -200,7 +186,7 @@ Write **Section 5: Next Steps**.
 # Streamlit App
 # -----------------------------------------------------------------------------------
 
-st.title('TypeFinder Team Report Generator (Simplified Intro)')
+st.title('TypeFinder Team Report Generator (Intro + Distribution Combined)')
 
 if 'team_size' not in st.session_state:
     st.session_state['team_size'] = 5
@@ -264,6 +250,7 @@ if st.button('Generate Report'):
                 preference_breakdowns += f"- {b}: {preference_counts[b]} members ({preference_percentages[b]}%)\n\n"
 
             # Count TypeFinder type distribution
+            from collections import Counter
             type_counts = Counter(team_typefinder_types)
             type_percentages = {
                 k: round((v / total_members) * 100)
@@ -318,6 +305,7 @@ if st.button('Generate Report'):
                 plt.close()
 
             # Prepare LLM
+            from langchain_community.chat_models import ChatOpenAI
             chat_model = ChatOpenAI(
                 openai_api_key=st.secrets['API_KEY'],
                 model_name='gpt-4o-2024-08-06',
@@ -325,6 +313,7 @@ if st.button('Generate Report'):
             )
 
             # Format the initial context
+            from langchain.prompts import PromptTemplate
             initial_context_template = PromptTemplate.from_template(initial_context)
             formatted_initial_context = initial_context_template.format(
                 TEAM_SIZE=str(team_size),
@@ -337,10 +326,13 @@ if st.button('Generate Report'):
             report_sections = {}
             report_so_far = ""
 
-            # The five sections in our structure
+            # We now have 4 sections:
+            # 1) Intro_and_Type_Distribution
+            # 2) Analysis of Dimension Preferences
+            # 3) Team Insights
+            # 4) Next Steps
             section_names = [
-                "Introduction",
-                "Analysis of Type Distribution",
+                "Intro_and_Type_Distribution",
                 "Analysis of Dimension Preferences",
                 "Team Insights",
                 "Next Steps"
@@ -352,6 +344,7 @@ if st.button('Generate Report'):
                     "INITIAL_CONTEXT": formatted_initial_context.strip(),
                     "REPORT_SO_FAR": report_so_far.strip()
                 }
+                from langchain.chains import LLMChain
                 chain = LLMChain(prompt=prompt_template, llm=chat_model)
                 section_text = chain.run(**prompt_vars)
                 report_sections[section_name] = section_text.strip()
@@ -360,8 +353,8 @@ if st.button('Generate Report'):
             # Display the final text in Streamlit
             for s_name in section_names:
                 st.markdown(report_sections[s_name])
-                # Show distribution plot after "Analysis of Type Distribution"
-                if s_name == "Analysis of Type Distribution":
+                # Show distribution plot after "Intro_and_Type_Distribution"
+                if s_name == "Intro_and_Type_Distribution":
                     st.header("Type Distribution Plot")
                     st.image(type_distribution_plot, use_column_width=True)
                 # Show preference pie charts after "Analysis of Dimension Preferences"
@@ -429,6 +422,9 @@ if st.button('Generate Report'):
                     leftIndent=20,
                 )
 
+                from markdown2 import markdown
+                from bs4 import BeautifulSoup
+
                 def process_markdown(md_text):
                     html = markdown(md_text, extras=['tables'])
                     soup = BeautifulSoup(html, 'html.parser')
@@ -436,7 +432,7 @@ if st.button('Generate Report'):
                         if isinstance(elem, str):
                             continue
 
-                        # Table
+                        # Handle table
                         if elem.name == 'table':
                             table_data = []
                             thead = elem.find('thead')
@@ -463,7 +459,7 @@ if st.button('Generate Report'):
                                     ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
                                     ('FONTNAME', (0, 0), (-1, 0), 'Times-Bold'),
                                     ('FONTNAME', (0, 1), (-1, -1), 'Times-Roman'),
-                                    ('BOTTOMPADDING', (0,0),(-1,0),12),
+                                    ('BOTTOMPADDING', (0,0), (-1,0),12),
                                     ('GRID', (0,0), (-1,-1), 1, colors.black),
                                 ]))
                                 elements.append(t)
@@ -490,28 +486,27 @@ if st.button('Generate Report'):
                             for li in elem.find_all('li', recursive=False):
                                 elements.append(Paragraph('• ' + li.text, styleList))
                                 elements.append(Spacer(1,6))
-
                         else:
+                            # Fallback for other tags
                             elements.append(Paragraph(elem.get_text(strip=True), styleN))
                             elements.append(Spacer(1,12))
 
-                # Build PDF from each section
+                # Build PDF from each of the 4 sections
                 for s_name in [
-                    "Introduction",
-                    "Analysis of Type Distribution",
+                    "Intro_and_Type_Distribution",
                     "Analysis of Dimension Preferences",
                     "Team Insights",
                     "Next Steps"
                 ]:
                     process_markdown(report_dict[s_name])
-                    # Insert distribution plot after Type Distribution
-                    if s_name == "Analysis of Type Distribution":
+                    # Insert distribution plot after "Intro_and_Type_Distribution"
+                    if s_name == "Intro_and_Type_Distribution":
                         elements.append(Spacer(1,12))
                         img_buf = io.BytesIO(dist_plot)
                         img = ReportLabImage(img_buf, width=400, height=240)
                         elements.append(img)
                         elements.append(Spacer(1,12))
-                    # Insert preference plots after Dimension Preferences
+                    # Insert preference plots after "Analysis of Dimension Preferences"
                     if s_name == "Analysis of Dimension Preferences":
                         for pair in [('E','I'), ('S','N'), ('T','F'), ('J','P')]:
                             key = ''.join(pair)
