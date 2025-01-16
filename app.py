@@ -22,74 +22,83 @@ from reportlab.lib import colors
 from markdown2 import markdown
 from bs4 import BeautifulSoup
 
-# -------------------------------
-# Initial Context and Prompts
-# -------------------------------
+# -----------------------------------------------------------------------------------
+# TypeFinder Types (16 common variations)
+# -----------------------------------------------------------------------------------
+typefinder_types = [
+    'INTJ', 'INTP', 'ENTJ', 'ENTP',
+    'INFJ', 'INFP', 'ENFJ', 'ENFP',
+    'ISTJ', 'ISFJ', 'ESTJ', 'ESFJ',
+    'ISTP', 'ISFP', 'ESTP', 'ESFP'
+]
 
-# Define the initial context shared across all LLM calls
+def randomize_types_callback():
+    randomized_types = [random.choice(typefinder_types) for _ in range(int(st.session_state['team_size']))]
+    for i in range(int(st.session_state['team_size'])):
+        key = f'mbti_{i}'
+        st.session_state[key] = randomized_types[i]
+
+# -----------------------------------------------------------------------------------
+# Updated Prompts Reflecting Best Practices
+# -----------------------------------------------------------------------------------
+
 initial_context = """
-You are an expert organizational psychologist specializing in team dynamics and personality assessments based on the TypeFinder framework.
+You are an expert organizational psychologist specializing in team dynamics and personality assessments using the TypeFinder framework.
+
+TypeFinder has four primary dimensions:
+1) Extraversion (E) vs. Introversion (I)
+2) Sensing (S) vs. Intuition (N)
+3) Thinking (T) vs. Feeling (F)
+4) Judging (J) vs. Perceiving (P)
+
+We avoid the term "MBTI" and call it "TypeFinder."
+We use “dimension” to describe the four pairs, and “preference” only when referencing one side (e.g., “preference for Thinking”).
 
 **Team Size:** {TEAM_SIZE}
 
 **Team Members and their TypeFinder Types:**
-
 {TEAM_MEMBERS_LIST}
 
-**TypeFinder Preference Breakdowns:**
-
+**Preference Counts/Percentages:**
 {PREFERENCE_BREAKDOWNS}
 
-**TypeFinder Type Breakdowns:**
-
+**Type Counts/Percentages:**
 {TYPE_BREAKDOWNS}
 
-Your task is to contribute to a comprehensive team personality report. The report consists of five sections, and you will be responsible for generating one of them. Please ensure that your section aligns seamlessly with the previous sections and maintains a consistent tone and style throughout the report.
+Your goal:
+Create a comprehensive team report with the following structure:
 
-The sections are:
+1. Introduction
+2. Analysis of Type Distribution
+3. Analysis of Dimension Preferences
+4. Team Insights
+5. Next Steps
 
-1. **Team Profile**
-
-2. **Type Distribution**
-
-3. **Team Insights**
-
-4. **Type Preference Breakdown**
-
-5. **Actions and Next Steps**
-
-**Formatting Requirements:**
-
-- Use clear headings and subheadings for your section.
-- Write in Markdown format for easy readability.
-- Use bullet points and tables where appropriate.
-- Ensure the content is specific to the provided team TypeFinder types and offers unique insights.
-- Avoid redundancy with previous sections!
-- Round all percentages to nearest whole number (eg, 60%, not 60.0%)
-- CRITICAL: NEVER OUTPUT THE PHRASE 'MBTI,' USE 'TypeFinder' IN PLACE OF IT!
+Follow these guidelines:
+- Always write in Markdown with clear headings (`##`, `###`, etc.).
+- Round percentages to the nearest whole number.
+- Never use the word “MBTI.”
+- Maintain a professional, neutral tone.
 """
 
-# Define prompts for each section
 prompts = {
-    "Team Profile": """
+    "Introduction": """
 {INITIAL_CONTEXT}
 
 **Your Role:**
 
-You are responsible for writing the **Team Profile** section of the report.
+Write **Section 1: Introduction** to the TypeFinder Team Report.
 
-**Section 1: Team Profile**
+## Section 1: Introduction
 
-- Begin by explaining each TypeFinder preference (Extraversion vs. Introversion, Sensing vs. Intuition, Thinking vs. Feeling, Judging vs. Perceiving).
-- For each preference, use the provided counts and percentages to describe the team composition (e.g., "There are X who are Introverted (I) and Y who are Extraverted (E), representing A% and B% of the team, respectively"), and subsequently, the 'team preference' for that specific dichotomy.
-- After covering all four preferences, present the overall 'team type' based on the most common traits.
-- Provide an analysis of the overall team type, including key characteristics and how it influences team dynamics.
-- **Use the provided data; do not compute any new statistics.**
-- Required length: Approximately 500 words.
+- Briefly explain the TypeFinder framework (4 dimensions, each with 2 preferences).
+- Provide a short rationale for how these preferences/types can help teams collaborate effectively.
+- Optionally introduce the concept of an overall "team type" if you'd like, or hold that for a later section.
+- ~400 words.
 
 **Begin your section below:**
 """,
-    "Type Distribution": """
+    "Analysis of Type Distribution": """
 {INITIAL_CONTEXT}
 
 **Report So Far:**
@@ -98,17 +107,39 @@ You are responsible for writing the **Team Profile** section of the report.
 
 **Your Role:**
 
-You are responsible for writing the **Type Distribution** section of the report.
+Write **Section 2: Analysis of Type Distribution**.
 
-**Section 2: Type Distribution**
+## Section 2: Analysis of Type Distribution
 
-- Begin with a **TypeFinder Type Breakdown**: Present the percentage breakdown of each TypeFinder type within the team using the provided data.
-- Include a section on **Team Similarity**: Discuss how similarities among team members might influence team cohesion and collaboration.
-- Include a section on **Team Diversity**: Discuss how differences among team members contribute to a variety of perspectives and skills within the team.
-- **Use the provided data; do not compute any new statistics.**
-- Required length: Approximately 500 words.
+- Present the percentages for each TypeFinder type (e.g., ISTJ, ENFP) from the provided data.
+- List the types **on the team** (with short bullet points describing each, plus count & %).
+- List any types **not** on the team (0%, absent).
+- Include a brief discussion of how certain distributions might affect communication and decision-making.
+- ~500 words.
 
-**Continue the report by adding your section below:**
+**Continue your report below:**
+""",
+    "Analysis of Dimension Preferences": """
+{INITIAL_CONTEXT}
+
+**Report So Far:**
+
+{REPORT_SO_FAR}
+
+**Your Role:**
+
+Write **Section 3: Analysis of Dimension Preferences**.
+
+## Section 3: Analysis of Dimension Preferences
+
+- For each dimension (E vs I, S vs N, T vs F, J vs P):
+  - Provide the counts/percentages for each preference (already in context, no new math).
+  - 1–2 paragraphs discussing how that preference split affects the team.
+- Insert references to relevant visual aids (pie charts) if desired.
+- If you wish, you can also mention a "Team Type" if it helps summarize the majority preferences. 
+- ~600 words total.
+
+**Continue your report below:**
 """,
     "Team Insights": """
 {INITIAL_CONTEXT}
@@ -119,19 +150,32 @@ You are responsible for writing the **Type Distribution** section of the report.
 
 **Your Role:**
 
-You are responsible for writing the **Team Insights** section of the report.
+Write **Section 4: Team Insights**.
 
-**Section 3: Team Insights**
+## Section 4: Team Insights
 
-- Under the **Team Insights** header, create two subheadings: **Strengths** and **Potential Blind Spots**.
-- For **Strengths**, identify at least four strengths of the team. Each strength should be presented as a bolded sentence, followed by a paragraph expanding on it.
-- For **Potential Blind Spots**, identify at least four potential blind spots or challenges. Each should be presented as a bolded sentence, followed by a paragraph expanding on it.
-- Ensure that the strengths and blind spots are based on the prevalent and less represented personality traits present in the team.
-- Required length: Approximately 700 words total (350 words for strengths, 350 words for blind spots).
+Create subheadings:
 
-**Continue the report by adding your section below:**
+1. **Strengths**  
+   - At least four strengths, each in **bold** on one line, then a paragraph.
+
+2. **Potential Blind Spots**  
+   - At least four challenges. Same formatting (bold line, then paragraph).
+
+3. **Communication**  
+   - 1–2 paragraphs on how dimension splits shape communication.
+
+4. **Teamwork**  
+   - 1–2 paragraphs on collaboration, workflow, synergy.
+
+5. **Conflict**  
+   - 1–2 paragraphs on possible friction points, plus suggestions.
+
+Total ~700 words.
+
+**Continue the report below:**
 """,
-    "Type Preference Breakdown": """
+    "Next Steps": """
 {INITIAL_CONTEXT}
 
 **Report So Far:**
@@ -140,163 +184,107 @@ You are responsible for writing the **Team Insights** section of the report.
 
 **Your Role:**
 
-You are responsible for writing the **Type Preference Breakdown** section of the report.
+Write **Section 5: Next Steps**.
 
-**Section 4: Type Preference Breakdown**
+## Section 5: Next Steps
 
-- For each TypeFinder dimension (Extraversion vs. Introversion, Sensing vs. Intuition, Thinking vs. Feeling, Judging vs. Perceiving):
-  - Use the provided counts and percentages to describe the team's percentage distribution.
-  - Create a separate table for each dimension using the data provided.
-  - Under each table, immediately provide a 200-word discussion of the implications of this specific distribution for workplace dynamics (no new header necessary).
-- Explain what these percentages mean for team communication, decision-making, and problem-solving.
-- **Use the provided data; do not compute any new statistics.**
-- Required length: Approximately 800 words.
+- Provide **actionable** recommendations for leveraging the TypeFinder composition.
+- Use subheadings (###) for each category of recommendations.
+- Under each, bullet points or numbered lists with blank lines between items.
+- End immediately after the final bullet (no concluding paragraph).
+- ~400 words.
 
-**Continue the report by adding your section below:**
-""",
-    "Actions and Next Steps": """
-{INITIAL_CONTEXT}
-
-**Report So Far:**
-
-{REPORT_SO_FAR}
-
-**Your Role:**
-
-You are responsible for writing the **Actions and Next Steps** section of the report.
-
-**Section 5: Actions and Next Steps**
-
-- Provide actionable recommendations for team leaders to enhance collaboration and performance, based on the analysis in the previous sections and the specific TypeFinder types present in the team.
-- Structure the recommendations with subheadings for each area of action. For each area, briefly justify why the personality composition leads you to make that recommendation.
-- Under each subheading, provide some bullet points or numbered lists of specific actions.
-- Don't make these suggestions too laborious or impractical to actually implement.
-- Immediately end your outputs after the last bullet, do not add anything after the final bullet! i.e., NO concluding filler text after this (NO filler concluding paragraph like "By following these recommendations...", "By integrating these actions...").
-- Required length: Approximately 400 words.
-
-**Conclude the report by adding your section below:**
+**Conclude the report below:**
 """
 }
 
-# -------------------------------
-# TypeFinder Types
-# -------------------------------
+# -----------------------------------------------------------------------------------
+# Streamlit App
+# -----------------------------------------------------------------------------------
 
-typefinder_types = [
-    'INTJ', 'INTP', 'ENTJ', 'ENTP',
-    'INFJ', 'INFP', 'ENFJ', 'ENFP',
-    'ISTJ', 'ISFJ', 'ESTJ', 'ESFJ',
-    'ISTP', 'ISFP', 'ESTP', 'ESFP'
-]
+st.title('TypeFinder Team Report Generator')
 
-# -------------------------------
-# Callback Function
-# -------------------------------
-
-def randomize_types_callback():
-    randomized_types = [random.choice(typefinder_types) for _ in range(int(st.session_state['team_size']))]
-    for i in range(int(st.session_state['team_size'])):
-        key = f'mbti_{i}'
-        st.session_state[key] = randomized_types[i]
-
-# -------------------------------
-# Streamlit App Layout
-# -------------------------------
-
-st.title('Truity Team Reports Generator')
-# Initialize the 'team_size' in session_state if not present
 if 'team_size' not in st.session_state:
     st.session_state['team_size'] = 5
 
-# Input for team size
 team_size = st.number_input(
     'Enter the number of team members (up to 30)', 
     min_value=1, max_value=30, value=5, key='team_size'
 )
 
-# Add a button to randomize TypeFinder types
 st.button('Randomize Types', on_click=randomize_types_callback)
 
-# Initialize list to store TypeFinder types
-team_typefinder_types = []
-
-# Input for TypeFinder types of each team member
 st.subheader('Enter TypeFinder types for each team member')
-
-# Ensure that session_state has entries for all team members
 for i in range(int(team_size)):
     if f'mbti_{i}' not in st.session_state:
         st.session_state[f'mbti_{i}'] = 'Select TypeFinder Type'
 
-# Display selection boxes
+team_typefinder_types = []
 for i in range(int(team_size)):
-    mbti_type = st.selectbox(
+    selected_type = st.selectbox(
         f'Team Member {i+1}',
         options=['Select TypeFinder Type'] + typefinder_types,
         key=f'mbti_{i}'
     )
-    if mbti_type != 'Select TypeFinder Type':
-        team_typefinder_types.append(mbti_type)
+    if selected_type != 'Select TypeFinder Type':
+        team_typefinder_types.append(selected_type)
     else:
-        team_typefinder_types.append(None)  # Ensure the list has the same length as team_size
+        team_typefinder_types.append(None)
 
-# Submit button
 if st.button('Generate Report'):
     if None in team_typefinder_types:
         st.error('Please select TypeFinder types for all team members.')
     else:
         with st.spinner('Generating report, please wait...'):
-            # Prepare the team types as a string
-            team_types_str = ', '.join(team_typefinder_types)
-            
-            # Prepare the team members list
+            # Build a list of members
             team_members_list = "\n".join([
-                f"{i+1}. Team Member {i+1}: {mbti_type}" 
-                for i, mbti_type in enumerate(team_typefinder_types)
+                f"{i+1}. Team Member {i+1}: {t}"
+                for i, t in enumerate(team_typefinder_types)
             ])
-            
-            # Compute counts and percentages for preferences
+
+            # Count preferences
             preference_counts = {'E': 0, 'I': 0, 'S': 0, 'N': 0, 'T': 0, 'F': 0, 'J': 0, 'P': 0}
+            total_members = len(team_typefinder_types)
             for t in team_typefinder_types:
                 if len(t) == 4:
                     preference_counts[t[0]] += 1  # E or I
                     preference_counts[t[1]] += 1  # S or N
                     preference_counts[t[2]] += 1  # T or F
                     preference_counts[t[3]] += 1  # J or P
-            total_members = len(team_typefinder_types)
-            preference_percentages = {k: round((v / total_members) * 100) for k, v in preference_counts.items()}
 
-            # Compute counts and percentages for types
-            type_counts = Counter(team_typefinder_types)
-            type_percentages = {k: int((v / total_members) * 100) for k, v in type_counts.items()}
+            preference_percentages = {
+                k: round((v / total_members) * 100)
+                for k, v in preference_counts.items()
+            }
 
-            # Prepare the preference breakdowns string
+            # Build a preference breakdown string
             preference_breakdowns = ""
-            for dichotomy in [('E', 'I'), ('S', 'N'), ('T', 'F'), ('J', 'P')]:
-                count1 = preference_counts[dichotomy[0]]
-                count2 = preference_counts[dichotomy[1]]
-                perc1 = preference_percentages[dichotomy[0]]
-                perc2 = preference_percentages[dichotomy[1]]
-                preference_breakdowns += f"**{dichotomy[0]} vs {dichotomy[1]}**\n"
-                preference_breakdowns += f"- {dichotomy[0]}: {count1} members ({perc1}%)\n"
-                preference_breakdowns += f"- {dichotomy[1]}: {count2} members ({perc2}%)\n\n"
+            for pair in [('E','I'), ('S','N'), ('T','F'), ('J','P')]:
+                a, b = pair[0], pair[1]
+                preference_breakdowns += f"**{a} vs {b}**\n"
+                preference_breakdowns += f"- {a}: {preference_counts[a]} members ({preference_percentages[a]}%)\n"
+                preference_breakdowns += f"- {b}: {preference_counts[b]} members ({preference_percentages[b]}%)\n\n"
 
-            # Prepare the type breakdowns string
-            type_breakdowns = "**TypeFinder Type Breakdown**\n"
-            for t, count in type_counts.items():
-                perc = type_percentages[t]
-                type_breakdowns += f"- {t}: {count} members ({perc}%)\n"
+            # Count TypeFinder type distribution
+            type_counts = Counter(team_typefinder_types)
+            type_percentages = {
+                k: round((v / total_members) * 100)
+                for k, v in type_counts.items()
+            }
+            
+            # Build a type breakdown string
+            type_breakdowns = ""
+            for t, c in type_counts.items():
+                p = type_percentages[t]
+                type_breakdowns += f"- {t}: {c} members ({p}%)\n"
 
-            # Generate plots
-            sns.set_style('whitegrid')  # Improve plot aesthetics
-            plt.rcParams.update({'font.family': 'serif'})  # Set plot fonts to serif
-
-            plots = {}
-            # Plot for TypeFinder Type Distribution
+            # Generate bar plot for type distribution
+            sns.set_style('whitegrid')
+            plt.rcParams.update({'font.family':'serif'})
             plt.figure(figsize=(10, 6))
             sns.barplot(
-                x=list(type_counts.keys()), 
-                y=list(type_counts.values()), 
+                x=list(type_counts.keys()),
+                y=list(type_counts.values()),
                 palette='viridis'
             )
             plt.title('TypeFinder Type Distribution', fontsize=16)
@@ -308,131 +296,136 @@ if st.button('Generate Report'):
             plt.savefig(buf, format='png')
             buf.seek(0)
             type_distribution_plot = buf.getvalue()
-            plots['type_distribution'] = type_distribution_plot
             plt.close()
 
-            # Plot for each preference dichotomy
+            # Generate preference pie charts
             preference_plots = {}
-            for dichotomy in [('E', 'I'), ('S', 'N'), ('T', 'F'), ('J', 'P')]:
-                labels = [dichotomy[0], dichotomy[1]]
-                sizes = [preference_counts[dichotomy[0]], preference_counts[dichotomy[1]]]
-                plt.figure(figsize=(6, 6))
+            for pair in [('E','I'), ('S','N'), ('T','F'), ('J','P')]:
+                labels = [pair[0], pair[1]]
+                sizes = [preference_counts[pair[0]], preference_counts[pair[1]]]
+                plt.figure(figsize=(6,6))
                 plt.pie(
-                    sizes, 
-                    labels=labels, 
-                    autopct='%1.1f%%', 
-                    startangle=90, 
+                    sizes,
+                    labels=labels,
+                    autopct='%1.1f%%',
+                    startangle=90,
                     colors=sns.color_palette('pastel'),
-                    textprops={'fontsize': 12, 'fontfamily': 'serif'}
+                    textprops={'fontsize':12, 'fontfamily':'serif'}
                 )
-                # plt.title(f'{dichotomy[0]} vs {dichotomy[1]} Preference Distribution', fontsize=14)
                 plt.tight_layout()
                 buf = io.BytesIO()
                 plt.savefig(buf, format='png')
                 buf.seek(0)
-                plot_data = buf.getvalue()
-                preference_plots[''.join(dichotomy)] = plot_data
+                preference_plots[''.join(pair)] = buf.getvalue()
                 plt.close()
 
-            # Initialize the LLM
+            # Prepare LLM
             chat_model = ChatOpenAI(
-                openai_api_key=st.secrets['API_KEY'], 
-                model_name='gpt-4o-2024-08-06', 
+                openai_api_key=st.secrets['API_KEY'],
+                model_name='gpt-4o-2024-08-06',
                 temperature=0.2
             )
 
-            # Prepare the initial context
+            # Format the initial context
             initial_context_template = PromptTemplate.from_template(initial_context)
             formatted_initial_context = initial_context_template.format(
                 TEAM_SIZE=str(team_size),
                 TEAM_MEMBERS_LIST=team_members_list,
-                TEAM_TYPES=team_types_str,
                 PREFERENCE_BREAKDOWNS=preference_breakdowns.strip(),
                 TYPE_BREAKDOWNS=type_breakdowns.strip()
             )
 
-            # Initialize variables to store the report
+            # Generate sections
             report_sections = {}
             report_so_far = ""
-            # Iterate over each section
-            for section_name in [
-                "Team Profile", 
-                "Type Distribution", 
-                "Team Insights", 
-                "Type Preference Breakdown", 
-                "Actions and Next Steps"
-            ]:
-                # Prepare the prompt
+
+            # The five sections in our new structure:
+            # 1) Introduction
+            # 2) Analysis of Type Distribution
+            # 3) Analysis of Dimension Preferences
+            # 4) Team Insights
+            # 5) Next Steps
+            section_names = [
+                "Introduction",
+                "Analysis of Type Distribution",
+                "Analysis of Dimension Preferences",
+                "Team Insights",
+                "Next Steps"
+            ]
+
+            for section_name in section_names:
                 prompt_template = PromptTemplate.from_template(prompts[section_name])
-                # Prepare the variables for the prompt
-                prompt_variables = {
+                prompt_vars = {
                     "INITIAL_CONTEXT": formatted_initial_context.strip(),
                     "REPORT_SO_FAR": report_so_far.strip()
                 }
-                # Create the chain
-                chat_chain = LLMChain(prompt=prompt_template, llm=chat_model)
-                # Generate the section
-                section_text = chat_chain.run(**prompt_variables)
-                # Store the section
+                chain = LLMChain(prompt=prompt_template, llm=chat_model)
+                section_text = chain.run(**prompt_vars)
                 report_sections[section_name] = section_text.strip()
-                # Update the report so far
                 report_so_far += f"\n\n{section_text.strip()}"
 
-            # Combine all sections into the final report
-            final_report = "\n\n".join([
-                report_sections["Team Profile"],
-                report_sections["Type Distribution"],
-                report_sections["Team Insights"],
-                report_sections["Type Preference Breakdown"],
-                report_sections["Actions and Next Steps"]
-            ])
-
-            # Display the report sections and intersperse plots
-            for section_name in [
-                "Team Profile", 
-                "Type Distribution", 
-                "Team Insights", 
-                "Type Preference Breakdown", 
-                "Actions and Next Steps"
-            ]:
-                st.markdown(report_sections[section_name])
-                if section_name == "Type Distribution":
-                    # Display Type Distribution plot
+            # Display the final text in the Streamlit app
+            for s_name in section_names:
+                st.markdown(report_sections[s_name])
+                # Show distribution plot after "Analysis of Type Distribution"
+                if s_name == "Analysis of Type Distribution":
                     st.header("Type Distribution Plot")
-                    st.image(plots['type_distribution'], use_column_width=True)
-                if section_name == "Type Preference Breakdown":
-                    # Display preference plots
-                    for dichotomy in [('E', 'I'), ('S', 'N'), ('T', 'F'), ('J', 'P')]:
-                        key = ''.join(dichotomy)
-                        st.header(f"{dichotomy[0]} vs {dichotomy[1]} Preference Distribution")
+                    st.image(type_distribution_plot, use_column_width=True)
+                # Show preference pie charts after "Analysis of Dimension Preferences"
+                if s_name == "Analysis of Dimension Preferences":
+                    for pair in [('E','I'),('S','N'),('T','F'),('J','P')]:
+                        key = ''.join(pair)
+                        st.header(f"{pair[0]} vs {pair[1]} Preference Distribution")
                         st.image(preference_plots[key], use_column_width=True)
 
-            # -------------------------------
-            # PDF Generation Function
-            # -------------------------------
-
-            def convert_markdown_to_pdf(report_sections_dict, plots_dict, preference_plots_dict):
-                # Initialize PDF document
+            # ----------------------------------------------------
+            # PDF Generation
+            # ----------------------------------------------------
+            def convert_markdown_to_pdf(report_dict, dist_plot, pref_plots):
                 pdf_buffer = io.BytesIO()
                 doc = SimpleDocTemplate(pdf_buffer, pagesize=letter)
                 elements = []
                 styles = getSampleStyleSheet()
-                
-                # Define a serif font style
+
+                styleH1 = ParagraphStyle(
+                    'Heading1Custom',
+                    parent=styles['Heading1'],
+                    fontName='Times-Bold',
+                    fontSize=18,
+                    leading=22,
+                    spaceAfter=10,
+                )
+                styleH2 = ParagraphStyle(
+                    'Heading2Custom',
+                    parent=styles['Heading2'],
+                    fontName='Times-Bold',
+                    fontSize=16,
+                    leading=20,
+                    spaceAfter=8,
+                )
+                styleH3 = ParagraphStyle(
+                    'Heading3Custom',
+                    parent=styles['Heading3'],
+                    fontName='Times-Bold',
+                    fontSize=14,
+                    leading=18,
+                    spaceAfter=6,
+                )
+                styleH4 = ParagraphStyle(
+                    'Heading4Custom',
+                    parent=styles['Heading4'],
+                    fontName='Times-Bold',
+                    fontSize=12,
+                    leading=16,
+                    spaceAfter=4,
+                )
+
                 styleN = ParagraphStyle(
                     'Normal',
                     parent=styles['Normal'],
                     fontName='Times-Roman',
                     fontSize=12,
                     leading=14,
-                )
-                styleH = ParagraphStyle(
-                    'Heading',
-                    parent=styles['Heading1'],
-                    fontName='Times-Bold',
-                    fontSize=18,
-                    leading=22,
-                    spaceAfter=10,
                 )
                 styleList = ParagraphStyle(
                     'List',
@@ -442,20 +435,17 @@ if st.button('Generate Report'):
                     leading=14,
                     leftIndent=20,
                 )
-                
-                from markdown2 import markdown
-                from bs4 import BeautifulSoup
-            
-                def process_markdown(text):
-                    html = markdown(text, extras=['tables'])
+
+                def process_markdown(md_text):
+                    html = markdown(md_text, extras=['tables'])
                     soup = BeautifulSoup(html, 'html.parser')
                     for elem in soup.contents:
                         if isinstance(elem, str):
-                            continue  # Skip strings like newlines
+                            continue
+
+                        # Table
                         if elem.name == 'table':
-                            # Handle table
                             table_data = []
-                            # Handle table header
                             thead = elem.find('thead')
                             if thead:
                                 header_row = []
@@ -463,14 +453,13 @@ if st.button('Generate Report'):
                                     header_row.append(th.get_text(strip=True))
                                 if header_row:
                                     table_data.append(header_row)
-                            # Handle table body
                             tbody = elem.find('tbody')
                             if tbody:
                                 rows = tbody.find_all('tr')
                             else:
                                 rows = elem.find_all('tr')
                             for row in rows:
-                                cols = row.find_all(['td', 'th'])
+                                cols = row.find_all(['td','th'])
                                 table_row = [col.get_text(strip=True) for col in cols]
                                 table_data.append(table_row)
                             if table_data:
@@ -481,73 +470,74 @@ if st.button('Generate Report'):
                                     ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
                                     ('FONTNAME', (0, 0), (-1, 0), 'Times-Bold'),
                                     ('FONTNAME', (0, 1), (-1, -1), 'Times-Roman'),
-                                    ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-                                    ('GRID', (0, 0), (-1, -1), 1, colors.black),
+                                    ('BOTTOMPADDING', (0,0),(-1,0),12),
+                                    ('GRID', (0,0), (-1,-1), 1, colors.black),
                                 ]))
                                 elements.append(t)
-                                elements.append(Spacer(1, 12))
-                        elif elem.name in ['h1', 'h2', 'h3']:
-                            elements.append(Paragraph(elem.text, styleH))
-                            elements.append(Spacer(1, 12))
+                                elements.append(Spacer(1,12))
+
+                        elif elem.name == 'h1':
+                            elements.append(Paragraph(elem.text, styleH1))
+                            elements.append(Spacer(1,12))
+                        elif elem.name == 'h2':
+                            elements.append(Paragraph(elem.text, styleH2))
+                            elements.append(Spacer(1,12))
+                        elif elem.name == 'h3':
+                            elements.append(Paragraph(elem.text, styleH3))
+                            elements.append(Spacer(1,12))
+                        elif elem.name == 'h4':
+                            elements.append(Paragraph(elem.text, styleH4))
+                            elements.append(Spacer(1,12))
+
                         elif elem.name == 'p':
                             elements.append(Paragraph(elem.decode_contents(), styleN))
-                            elements.append(Spacer(1, 12))
+                            elements.append(Spacer(1,12))
+
                         elif elem.name == 'ul':
                             for li in elem.find_all('li', recursive=False):
                                 elements.append(Paragraph('• ' + li.text, styleList))
-                                elements.append(Spacer(1, 12))
+                                elements.append(Spacer(1,6))
+
                         else:
                             elements.append(Paragraph(elem.get_text(strip=True), styleN))
-                            elements.append(Spacer(1, 12))
+                            elements.append(Spacer(1,12))
 
-                # Add each section and corresponding plots
-                for section_name in [
-                    "Team Profile", 
-                    "Type Distribution", 
-                    "Team Insights", 
-                    "Type Preference Breakdown", 
-                    "Actions and Next Steps"
+                # Build PDF from each section
+                for s_name in [
+                    "Introduction",
+                    "Analysis of Type Distribution",
+                    "Analysis of Dimension Preferences",
+                    "Team Insights",
+                    "Next Steps"
                 ]:
-                    # Add the section text
-                    section_text = report_sections_dict[section_name]
-                    process_markdown(section_text)
-                    
-                    # After specific sections, add plots
-                    if section_name == "Type Distribution":
-                        # Add Type Distribution plot
-                        elements.append(Spacer(1, 12))
-                        img_buffer = io.BytesIO(plots_dict['type_distribution'])
-                        img = ReportLabImage(img_buffer, width=400, height=240)  # Adjust size as needed
+                    process_markdown(report_dict[s_name])
+                    # Insert distribution plot after Type Distribution
+                    if s_name == "Analysis of Type Distribution":
+                        elements.append(Spacer(1,12))
+                        img_buf = io.BytesIO(dist_plot)
+                        img = ReportLabImage(img_buf, width=400, height=240)
                         elements.append(img)
-                        elements.append(Spacer(1, 12))
-                    if section_name == "Type Preference Breakdown":
-                        # Add preference plots
-                        for dichotomy in [('E', 'I'), ('S', 'N'), ('T', 'F'), ('J', 'P')]:
-                            key = ''.join(dichotomy)
-                            elements.append(Spacer(1, 12))
-                            img_buffer = io.BytesIO(preference_plots_dict[key])
-                            elements.append(Paragraph(f"{dichotomy[0]} vs {dichotomy[1]} Preference Distribution", styleH))
-                            img = ReportLabImage(img_buffer, width=300, height=300)  # Adjust size as needed
-                            elements.append(img)
-                            elements.append(Spacer(1, 12))
-            
-                # Build PDF
+                        elements.append(Spacer(1,12))
+                    # Insert preference plots after Dimension Preferences
+                    if s_name == "Analysis of Dimension Preferences":
+                        for pair in [('E','I'), ('S','N'), ('T','F'), ('J','P')]:
+                            key = ''.join(pair)
+                            elements.append(Spacer(1,12))
+                            elements.append(Paragraph(f"{pair[0]} vs {pair[1]} Preference Distribution", styleH2))
+                            pbuf = io.BytesIO(pref_plots[key])
+                            pimg = ReportLabImage(pbuf, width=300, height=300)
+                            elements.append(pimg)
+                            elements.append(Spacer(1,12))
+
                 doc.build(elements)
                 pdf_buffer.seek(0)
                 return pdf_buffer
 
+            pdf_data = convert_markdown_to_pdf(report_sections, type_distribution_plot, preference_plots)
 
-            # -------------------------------
-            # Generate PDF
-            # -------------------------------
-
-            # Convert the report to PDF
-            pdf_data = convert_markdown_to_pdf(report_sections, plots, preference_plots)
-
-            # Download button for the report
             st.download_button(
                 label="Download Report as PDF",
                 data=pdf_data,
-                file_name="team_personality_report.pdf",
+                file_name="typefinder_team_report.pdf",
                 mime="application/pdf"
             )
