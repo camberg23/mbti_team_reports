@@ -39,7 +39,7 @@ def randomize_types_callback():
         st.session_state[key] = randomized_types[i]
 
 # -----------------------------------------------------------------------------------
-# Updated Prompts Reflecting Best Practices
+# Updated Prompts (Simplified Introduction)
 # -----------------------------------------------------------------------------------
 
 initial_context = """
@@ -66,18 +66,18 @@ We use “dimension” to describe the four pairs, and “preference” only whe
 {TYPE_BREAKDOWNS}
 
 Your goal:
-Create a comprehensive team report with the following structure:
+Create a comprehensive team report with these sections:
 
-1. Introduction
-2. Analysis of Type Distribution
-3. Analysis of Dimension Preferences
-4. Team Insights
-5. Next Steps
+1. Introduction  
+2. Analysis of Type Distribution  
+3. Analysis of Dimension Preferences  
+4. Team Insights  
+5. Next Steps  
 
 Follow these guidelines:
-- Always write in Markdown with clear headings (`##`, `###`, etc.).
+- Keep language short and clear.
 - Round percentages to the nearest whole number.
-- Never use the word “MBTI.”
+- Never use "MBTI."
 - Maintain a professional, neutral tone.
 """
 
@@ -91,10 +91,9 @@ Write **Section 1: Introduction** to the TypeFinder Team Report.
 
 ## Section 1: Introduction
 
-- Briefly explain the TypeFinder framework (4 dimensions, each with 2 preferences).
-- Provide a short rationale for how these preferences/types can help teams collaborate effectively.
-- Optionally introduce the concept of an overall "team type" if you'd like, or hold that for a later section.
-- ~400 words.
+- Provide a **short** introduction paragraph or two explaining the TypeFinder framework (the four dimensions).
+- Briefly state how understanding these types can help teams work more effectively.
+- ~200 words max.
 
 **Begin your section below:**
 """,
@@ -112,8 +111,8 @@ Write **Section 2: Analysis of Type Distribution**.
 ## Section 2: Analysis of Type Distribution
 
 - Present the percentages for each TypeFinder type (e.g., ISTJ, ENFP) from the provided data.
-- List the types **on the team** (with short bullet points describing each, plus count & %).
-- List any types **not** on the team (0%, absent).
+- List the types **on the team** (with short bullet points describing each, plus count & %), from most common to least common.
+- List any types **not** on the team (0%, absent) with the same info.
 - Include a brief discussion of how certain distributions might affect communication and decision-making.
 - ~500 words.
 
@@ -133,10 +132,9 @@ Write **Section 3: Analysis of Dimension Preferences**.
 ## Section 3: Analysis of Dimension Preferences
 
 - For each dimension (E vs I, S vs N, T vs F, J vs P):
-  - Provide the counts/percentages for each preference (already in context, no new math).
+  - Provide the counts/percentages for each preference (already in context).
   - 1–2 paragraphs discussing how that preference split affects the team.
-- Insert references to relevant visual aids (pie charts) if desired.
-- If you wish, you can also mention a "Team Type" if it helps summarize the majority preferences. 
+- You may optionally mention a collective 'team type' if applicable.
 - ~600 words total.
 
 **Continue your report below:**
@@ -154,26 +152,26 @@ Write **Section 4: Team Insights**.
 
 ## Section 4: Team Insights
 
-Create subheadings:
+Use the following subheadings:
 
 1. **Strengths**  
-   - At least four strengths, each in **bold** on one line, then a paragraph.
+   - At least four strengths, each in **bold** (one line), followed by a paragraph.
 
 2. **Potential Blind Spots**  
-   - At least four challenges. Same formatting (bold line, then paragraph).
+   - At least four potential challenges, same bolded format + paragraph.
 
 3. **Communication**  
-   - 1–2 paragraphs on how dimension splits shape communication.
+   - 1–2 paragraphs about dimension splits in communication.
 
 4. **Teamwork**  
-   - 1–2 paragraphs on collaboration, workflow, synergy.
+   - 1–2 paragraphs about collaboration, synergy.
 
 5. **Conflict**  
-   - 1–2 paragraphs on possible friction points, plus suggestions.
+   - 1–2 paragraphs about friction points, resolution suggestions.
 
-Total ~700 words.
+~700 words total.
 
-**Continue the report below:**
+**Continue your report below:**
 """,
     "Next Steps": """
 {INITIAL_CONTEXT}
@@ -190,8 +188,8 @@ Write **Section 5: Next Steps**.
 
 - Provide **actionable** recommendations for leveraging the TypeFinder composition.
 - Use subheadings (###) for each category of recommendations.
-- Under each, bullet points or numbered lists with blank lines between items.
-- End immediately after the final bullet (no concluding paragraph).
+- Bullet points or numbered lists with blank lines between items.
+- End right after the final bullet (no concluding paragraph).
 - ~400 words.
 
 **Conclude the report below:**
@@ -202,7 +200,7 @@ Write **Section 5: Next Steps**.
 # Streamlit App
 # -----------------------------------------------------------------------------------
 
-st.title('TypeFinder Team Report Generator')
+st.title('TypeFinder Team Report Generator (Simplified Intro)')
 
 if 'team_size' not in st.session_state:
     st.session_state['team_size'] = 5
@@ -247,10 +245,10 @@ if st.button('Generate Report'):
             total_members = len(team_typefinder_types)
             for t in team_typefinder_types:
                 if len(t) == 4:
-                    preference_counts[t[0]] += 1  # E or I
-                    preference_counts[t[1]] += 1  # S or N
-                    preference_counts[t[2]] += 1  # T or F
-                    preference_counts[t[3]] += 1  # J or P
+                    preference_counts[t[0]] += 1
+                    preference_counts[t[1]] += 1
+                    preference_counts[t[2]] += 1
+                    preference_counts[t[3]] += 1
 
             preference_percentages = {
                 k: round((v / total_members) * 100)
@@ -339,12 +337,7 @@ if st.button('Generate Report'):
             report_sections = {}
             report_so_far = ""
 
-            # The five sections in our new structure:
-            # 1) Introduction
-            # 2) Analysis of Type Distribution
-            # 3) Analysis of Dimension Preferences
-            # 4) Team Insights
-            # 5) Next Steps
+            # The five sections in our structure
             section_names = [
                 "Introduction",
                 "Analysis of Type Distribution",
@@ -364,7 +357,7 @@ if st.button('Generate Report'):
                 report_sections[section_name] = section_text.strip()
                 report_so_far += f"\n\n{section_text.strip()}"
 
-            # Display the final text in the Streamlit app
+            # Display the final text in Streamlit
             for s_name in section_names:
                 st.markdown(report_sections[s_name])
                 # Show distribution plot after "Analysis of Type Distribution"
@@ -373,7 +366,7 @@ if st.button('Generate Report'):
                     st.image(type_distribution_plot, use_column_width=True)
                 # Show preference pie charts after "Analysis of Dimension Preferences"
                 if s_name == "Analysis of Dimension Preferences":
-                    for pair in [('E','I'),('S','N'),('T','F'),('J','P')]:
+                    for pair in [('E','I'), ('S','N'), ('T','F'), ('J','P')]:
                         key = ''.join(pair)
                         st.header(f"{pair[0]} vs {pair[1]} Preference Distribution")
                         st.image(preference_plots[key], use_column_width=True)
