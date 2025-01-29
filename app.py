@@ -195,7 +195,7 @@ st.title('TypeFinder Team Report Generator (Intro + Distribution Combined)')
 
 # Let user specify custom cover page info
 st.subheader("Cover Page Details")
-logo_path = "logo.png"  # You said the logo is in the root as logo.png
+logo_path = "truity_logo.png"  # You said the logo is in the root as logo.png
 company_name = st.text_input("Company Name (for cover page)", "Channing Realty")
 team_name = st.text_input("Team Name (for cover page)", "Marketing Team")
 today_str = datetime.date.today().strftime("%B %d, %Y")
