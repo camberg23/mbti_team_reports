@@ -47,7 +47,7 @@ def parse_tf_type(tf_str: str) -> str:
     return ""
 
 # -----------------------------------------------------------------------------------
-# Updated Prompts
+# Minimal Prompt Edits to Mention User Names + Fractional Sums
 # -----------------------------------------------------------------------------------
 
 initial_context = """
@@ -89,6 +89,7 @@ Follow these guidelines:
 """
 
 prompts = {
+    # NOTE: We add instructions about naming each user in "Types on the Team"
     "Intro_and_Type_Distribution": """
 {INITIAL_CONTEXT}
 
@@ -107,7 +108,8 @@ Write **Section 1: Intro & Type Distribution** as a single combined section.
 
 2. **Type Distribution**
    - Present the percentages for each TypeFinder type (ISTJ, ENFP, etc.) based on the provided data.
-   - Under a subheading `### Types on the Team`, list each type present (with short bullet points describing it, plus count & %).
+   - Under a subheading `### Types on the Team`, list each type present (with short bullet points describing it, plus count & %),
+     **and explicitly name each user who holds that type** (e.g., "ISTJ (2 members: Alice, Bob)...").
    - Under a subheading `### Types Not on the Team`, incorporate the data above (count=0, 0%).
    - Briefly discuss how certain distributions might affect communication/decision-making.
 
@@ -115,6 +117,8 @@ Write **Section 1: Intro & Type Distribution** as a single combined section.
 
 **Begin your combined section below:**
 """,
+
+    # NOTE: We add instructions to reference fractional sums explicitly
     "Analysis of Dimension Preferences": """
 {INITIAL_CONTEXT}
 
@@ -128,13 +132,13 @@ Write **Section 2: Analysis of Dimension Preferences**.
 
 ## Section 2: Analysis of Dimension Preferences
 
-- For each dimension (E vs I, S vs N, T vs F, J vs P):
-  - Provide the counts/percentages for each preference (already in context).
-  - 1–2 paragraphs discussing how that preference split affects team collaboration and workflow.
+- Use the provided preference counts/percentages (which may be based on fractional sums) for each dimension (E vs I, S vs N, T vs F, J vs P).
+- Clearly mention how the fractional or partial data was used to arrive at the final counts, and interpret these results for collaboration and workflow.
 - ~600 words total.
 
 **Continue your report below:**
 """,
+
     "Team Insights": """
 {INITIAL_CONTEXT}
 
@@ -169,6 +173,7 @@ Use the following subheadings:
 
 **Continue the report below:**
 """,
+
     "Next Steps": """
 {INITIAL_CONTEXT}
 
@@ -196,25 +201,16 @@ Write **Section 4: Next Steps**.
 # Streamlit App
 # -----------------------------------------------------------------------------------
 
-st.title('TypeFinder Team Report Generator (CSV-based with dimension data)')
+st.title('TypeFinder Team Report Generator (CSV-based, fractional dimension data)')
 
 st.subheader("Cover Page Details")
-logo_path = "truity_logo.png"  # your logo path
+logo_path = "truity_logo.png"
 company_name = st.text_input("Company Name (for cover page)", "Channing Realty")
 team_name = st.text_input("Team Name (for cover page)", "Marketing Team")
 today_str = datetime.date.today().strftime("%B %d, %Y")
 custom_date = st.text_input("Date (for cover page)", today_str)
 
-st.subheader("Upload CSV with columns:")
-st.markdown("""
-- **User Name** (string)
-- **TF Type** (one of the 16, e.g. INFP, ESFJ, etc.)
-- **TF E/I** (float, % favoring E, e.g. 55 -> 55% E, 45% I)
-- **TF N/S** (float, % favoring N)
-- **TF F/T** (float, % favoring F)
-- **TF J/P** (float, % favoring J)
-""")
-
+st.subheader("Upload CSV with columns: User Name, TF Type, TF E/I, TF N/S, TF F/T, TF J/P")
 csv_file = st.file_uploader("Choose a CSV file", type=["csv"])
 
 if st.button("Generate Report from CSV"):
@@ -224,156 +220,109 @@ if st.button("Generate Report from CSV"):
         with st.spinner("Generating report..."):
             df = pd.read_csv(csv_file)
 
-            # We'll parse valid rows (have a recognized TF Type) and gather dimension %.
             valid_rows = []
             for i, row in df.iterrows():
-                name_val = row.get("User Name", "")
-                type_val = row.get("TF Type", "")
-                e_val = row.get("TF E/I", "")
-                n_val = row.get("TF N/S", "")
-                f_val = row.get("TF F/T", "")
-                j_val = row.get("TF J/P", "")
+                nm_val = row.get("User Name", "")
+                tf_val = row.get("TF Type", "")
+                ei_val = row.get("TF E/I", "")
+                ns_val = row.get("TF N/S", "")
+                ft_val = row.get("TF F/T", "")
+                jp_val = row.get("TF J/P", "")
 
-                # Convert to strings for name/type
-                name_str = str(name_val).strip()
-                tf_type = parse_tf_type(str(type_val))
+                name_str = str(nm_val).strip()
+                tf_parsed = parse_tf_type(tf_val)
 
-                if name_str and tf_type:
-                    # We'll try to parse the dimension percentages as floats
+                if name_str and tf_parsed:
+                    # Try dimension floats
                     try:
-                        e_float = float(e_val) if e_val != "" else None
-                        n_float = float(n_val) if n_val != "" else None
-                        f_float = float(f_val) if f_val != "" else None
-                        j_float = float(j_val) if j_val != "" else None
+                        eFloat = float(ei_val) if ei_val != "" else None
+                        nFloat = float(ns_val) if ns_val != "" else None
+                        fFloat = float(ft_val) if ft_val != "" else None
+                        jFloat = float(jp_val) if jp_val != "" else None
                     except:
-                        # If we can't parse them, set them to None
-                        e_float = n_float = f_float = j_float = None
-                    
-                    valid_rows.append((name_str, tf_type, e_float, n_float, f_float, j_float))
-            
+                        eFloat = nFloat = fFloat = jFloat = None
+
+                    valid_rows.append((name_str, tf_parsed, eFloat, nFloat, fFloat, jFloat))
+
             if not valid_rows:
-                st.error("No valid TypeFinder data found in CSV. Nothing to report.")
+                st.error("No valid TypeFinder rows found.")
             else:
-                # Prepare dimension counts
-                # We'll sum up E, I, S, N, T, F, J, P as float amounts
-                # e.g. for E=55 => we add 0.55 to E, 0.45 to I
-                dimension_sums = {
-                    'E': 0.0, 'I': 0.0,
-                    'S': 0.0, 'N': 0.0,
-                    'T': 0.0, 'F': 0.0,
-                    'J': 0.0, 'P': 0.0
-                }
-                count_dimension_rows = 0
+                # dimension sums
+                dimension_sums = {'E':0.0,'I':0.0,'S':0.0,'N':0.0,'T':0.0,'F':0.0,'J':0.0,'P':0.0}
+                dimension_rows_count = 0
 
                 team_list_str = ""
                 type_list = []
 
-                for idx, (nm, tf, eF, nF, fF, jF) in enumerate(valid_rows, start=1):
-                    team_list_str += f"{idx}. {nm}: {tf}\n"
-                    type_list.append(tf)
+                for idx, (nm, code, eF, nF, fF, jF) in enumerate(valid_rows, start=1):
+                    team_list_str += f"{idx}. {nm}: {code}\n"
+                    type_list.append(code)
 
-                    # If we have dimension data, sum them
-                    # e.g. eF=55 => E += 0.55, I += 0.45
-                    # We'll do this for whichever columns are not None
-                    if (eF is not None and
-                        nF is not None and
-                        fF is not None and
-                        jF is not None):
-                        # Convert to fraction
-                        e_frac = eF / 100.0
-                        i_frac = 1.0 - e_frac
+                    if (eF is not None and nF is not None and fF is not None and jF is not None):
+                        e_frac = eF/100.0
+                        i_frac = 1 - e_frac
                         dimension_sums['E'] += e_frac
                         dimension_sums['I'] += i_frac
 
-                        n_frac = nF / 100.0
-                        s_frac = 1.0 - n_frac
+                        n_frac = nF/100.0
+                        s_frac = 1 - n_frac
                         dimension_sums['N'] += n_frac
                         dimension_sums['S'] += s_frac
 
-                        f_frac = fF / 100.0
-                        t_frac = 1.0 - f_frac
+                        f_frac = fF/100.0
+                        t_frac = 1 - f_frac
                         dimension_sums['F'] += f_frac
                         dimension_sums['T'] += t_frac
 
-                        j_frac = jF / 100.0
-                        p_frac = 1.0 - j_frac
+                        j_frac = jF/100.0
+                        p_frac = 1 - j_frac
                         dimension_sums['J'] += j_frac
                         dimension_sums['P'] += p_frac
 
-                        count_dimension_rows += 1
+                        dimension_rows_count += 1
 
                 total_members = len(valid_rows)
 
-                # For dimension sums, let's interpret them as "equivalent count"
-                # e.g. if dimension_sums['E'] = 5.3 => means 5.3 "people" favored E
-                # We'll round at the end
-                # If we had partial dimension data for only some rows, count_dimension_rows is how many had numeric columns
-                # but the user wants a *team-wide proportion*, so let's keep it with total_members or dimension_rows
-                # We'll assume if some rows are missing dimension data, we exclude them from dimension calcs
-                # => dimension_sums['E'] / count_dimension_rows => average fraction
-                # => multiply by count_dimension_rows to get "count"
-                # Then the user sees partial data, but let's keep it simpler
-
-                if count_dimension_rows > 0:
-                    # We'll scale up to "out of total_members" for simplicity
-                    # so fractionE = ( dimension_sums['E'] / count_dimension_rows ) * total_members
-                    # That way, the final bar/pie is representative of all X members
-                    scale_factor = float(total_members) / float(count_dimension_rows)
+                # scale if partial dimension data
+                if dimension_rows_count > 0:
+                    scale_factor = float(total_members)/dimension_rows_count
                 else:
-                    scale_factor = 1.0  # no dimension data at all => fallback
+                    scale_factor = 1.0
 
                 for k in dimension_sums:
-                    dimension_sums[k] = dimension_sums[k] * scale_factor
+                    dimension_sums[k] *= scale_factor
 
-                # We'll convert these "counts" to integer or round them
-                # Then we can compute preference_counts
-                preference_counts = {}
-                for dkey in dimension_sums:
-                    preference_counts[dkey] = round(dimension_sums[dkey])
+                # Round to get "counts"
+                preference_counts = {k: round(v) for k,v in dimension_sums.items()}
 
-                # Now let's get percentages
-                # sum of E + I might not match total_members if some didn't have dimension data
-                # We'll do a safe approach for each pair
-                # E vs I
-                # S vs N
-                # T vs F
-                # J vs P
-                # We'll compute sum of each pair, then get percentage of total
-                def pair_percent(a, b):
+                # Convert to pair-based percentages
+                def pair_percent(a,b):
                     s = preference_counts[a] + preference_counts[b]
-                    if s <= 0:
-                        return (0, 0)
-                    pa = round((preference_counts[a] / s) * 100)
+                    if s <= 0: return (0,0)
+                    pa = round((preference_counts[a]/s)*100)
                     pb = 100 - pa
-                    return (pa, pb)
+                    return (pa,pb)
 
-                # We'll build the final preference_count/percentage dict
                 final_pref_counts = {}
                 final_pref_pcts = {}
-                for pair in [('E','I'), ('S','N'), ('T','F'), ('J','P')]:
-                    a, b = pair[0], pair[1]
+                for pair in [('E','I'),('S','N'),('T','F'),('J','P')]:
+                    a, b = pair
                     final_pref_counts[a] = preference_counts[a]
                     final_pref_counts[b] = preference_counts[b]
-                    pa, pb = pair_percent(a, b)
+                    pa, pb = pair_percent(a,b)
                     final_pref_pcts[a] = pa
                     final_pref_pcts[b] = pb
 
-                # We'll create a preference_breakdowns string
                 preference_breakdowns = ""
-                for pair in [('E','I'), ('S','N'), ('T','F'), ('J','P')]:
-                    a, b = pair[0], pair[1]
+                for pair in [('E','I'),('S','N'),('T','F'),('J','P')]:
+                    a, b = pair
                     preference_breakdowns += f"**{a} vs {b}**\n"
                     preference_breakdowns += f"- {a}: {final_pref_counts[a]} members ({final_pref_pcts[a]}%)\n"
                     preference_breakdowns += f"- {b}: {final_pref_counts[b]} members ({final_pref_pcts[b]}%)\n\n"
 
                 # Type distribution
                 type_counts = Counter(type_list)
-                type_percentages = {
-                    t: round((c / total_members) * 100)
-                    for t, c in type_counts.items()
-                }
-
-                # Identify absent types
+                type_percentages = {t: round((c/total_members)*100) for t,c in type_counts.items()}
                 absent_types = [t for t in typefinder_types if t not in type_counts]
                 not_on_team_list_str = ""
                 if absent_types:
@@ -382,21 +331,18 @@ if st.button("Generate Report from CSV"):
                 else:
                     not_on_team_list_str = "None (All Types Represented)"
 
-                # Build a type breakdown string
                 type_breakdowns = ""
                 for t, c in type_counts.items():
-                    p = type_percentages[t]
-                    type_breakdowns += f"- {t}: {c} members ({p}%)\n"
+                    pct = type_percentages[t]
+                    type_breakdowns += f"- {t}: {c} members ({pct}%)\n"
 
-                # ---------------------
-                # Build bar chart for types
-                # ---------------------
+                # bar chart
                 sns.set_style('whitegrid')
                 plt.rcParams.update({'font.family':'serif'})
-                plt.figure(figsize=(10, 6))
-                sorted_types = sorted(type_counts.keys())
-                sorted_counts = [type_counts[t] for t in sorted_types]
-                sns.barplot(x=sorted_types, y=sorted_counts, palette='viridis')
+                plt.figure(figsize=(10,6))
+                sorted_t = sorted(type_counts.keys())
+                sorted_ct = [type_counts[x] for x in sorted_t]
+                sns.barplot(x=sorted_t, y=sorted_ct, palette='viridis')
                 plt.title('TypeFinder Type Distribution', fontsize=16)
                 plt.xlabel('TypeFinder Types', fontsize=14)
                 plt.ylabel('Number of Team Members', fontsize=14)
@@ -408,27 +354,26 @@ if st.button("Generate Report from CSV"):
                 type_distribution_plot = buf.getvalue()
                 plt.close()
 
-                # For dimension pies, we now have final_pref_counts
+                # preference pie charts
                 preference_plots = {}
-                for pair in [('E','I'), ('S','N'), ('T','F'), ('J','P')]:
-                    labels = [pair[0], pair[1]]
-                    # get counts from final_pref_counts
+                for pair in [('E','I'),('S','N'),('T','F'),('J','P')]:
+                    lbl = [pair[0], pair[1]]
                     c1 = final_pref_counts[pair[0]]
                     c2 = final_pref_counts[pair[1]]
                     plt.figure(figsize=(6,6))
                     plt.pie(
-                        [c1, c2],
-                        labels=labels,
+                        [c1,c2],
+                        labels=lbl,
                         autopct='%1.1f%%',
                         startangle=90,
                         colors=sns.color_palette('pastel'),
                         textprops={'fontsize':12, 'fontfamily':'serif'}
                     )
                     plt.tight_layout()
-                    b = io.BytesIO()
-                    plt.savefig(b, format='png')
-                    b.seek(0)
-                    preference_plots[''.join(pair)] = b.getvalue()
+                    pbuf = io.BytesIO()
+                    plt.savefig(pbuf, format='png')
+                    pbuf.seek(0)
+                    preference_plots[''.join(pair)] = pbuf.getvalue()
                     plt.close()
 
                 # Prepare LLM
@@ -438,7 +383,7 @@ if st.button("Generate Report from CSV"):
                     temperature=0.2
                 )
 
-                # Format the initial context
+                # Format context
                 initial_context_template = PromptTemplate.from_template(initial_context)
                 formatted_initial_context = initial_context_template.format(
                     TEAM_SIZE=str(total_members),
@@ -450,56 +395,46 @@ if st.button("Generate Report from CSV"):
                 # Generate sections
                 report_sections = {}
                 report_so_far = ""
-                section_names = [
+                section_order = [
                     "Intro_and_Type_Distribution",
                     "Analysis of Dimension Preferences",
                     "Team Insights",
                     "Next Steps"
                 ]
-
-                for section_name in section_names:
-                    if section_name == "Intro_and_Type_Distribution":
-                        prompt_template = PromptTemplate.from_template(prompts[section_name])
+                for sec in section_order:
+                    if sec == "Intro_and_Type_Distribution":
+                        prompt_template = PromptTemplate.from_template(prompts[sec])
                         prompt_vars = {
                             "INITIAL_CONTEXT": formatted_initial_context.strip(),
                             "REPORT_SO_FAR": report_so_far.strip(),
                             "NOT_ON_TEAM_LIST": not_on_team_list_str
                         }
                     else:
-                        prompt_template = PromptTemplate.from_template(prompts[section_name])
+                        prompt_template = PromptTemplate.from_template(prompts[sec])
                         prompt_vars = {
                             "INITIAL_CONTEXT": formatted_initial_context.strip(),
                             "REPORT_SO_FAR": report_so_far.strip()
                         }
 
                     chain = LLMChain(prompt=prompt_template, llm=chat_model)
-                    section_text = chain.run(**prompt_vars)
-                    report_sections[section_name] = section_text.strip()
-                    report_so_far += f"\n\n{section_text.strip()}"
+                    section_txt = chain.run(**prompt_vars)
+                    report_sections[sec] = section_txt.strip()
+                    report_so_far += f"\n\n{section_txt.strip()}"
 
-                # Display final text in Streamlit
-                for s_name in section_names:
-                    st.markdown(report_sections[s_name])
-                    if s_name == "Intro_and_Type_Distribution":
+                for sec in section_order:
+                    st.markdown(report_sections[sec])
+                    if sec == "Intro_and_Type_Distribution":
                         st.header("Type Distribution Plot")
                         st.image(type_distribution_plot, use_column_width=True)
-                    if s_name == "Analysis of Dimension Preferences":
-                        for pair in [('E','I'), ('S','N'), ('T','F'), ('J','P')]:
+                    if sec == "Analysis of Dimension Preferences":
+                        for pair in [('E','I'),('S','N'),('T','F'),('J','P')]:
                             st.header(f"{pair[0]} vs {pair[1]} Preference Distribution")
                             st.image(preference_plots[''.join(pair)], use_column_width=True)
 
-                # -------------------------------------------------------------------
-                # PDF Generation with Cover Page
-                # -------------------------------------------------------------------
+                # PDF with cover
                 def build_cover_page(logo_path, type_system_name, company_name, team_name, date_str):
-                    from reportlab.platypus import Spacer, Paragraph, Image as RepImage, HRFlowable, PageBreak
-                    from reportlab.lib.enums import TA_CENTER
-                    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-                    from reportlab.lib import colors
-
                     cov_elems = []
                     styles = getSampleStyleSheet()
-
                     cover_title_style = ParagraphStyle(
                         'CoverTitle',
                         parent=styles['Title'],
@@ -517,60 +452,51 @@ if st.button("Generate Report from CSV"):
                         alignment=TA_CENTER,
                         spaceAfter=8
                     )
-
-                    cov_elems.append(Spacer(1, 80))
+                    cov_elems.append(Spacer(1,80))
                     try:
-                        logo_img = RepImage(logo_path, width=140, height=52)
-                        cov_elems.append(logo_img)
+                        lg = Image(logo_path, width=140, height=52)
                     except:
-                        pass
-
-                    cov_elems.append(Spacer(1, 50))
-
+                        lg = None
+                    if lg:
+                        cov_elems.append(lg)
+                    cov_elems.append(Spacer(1,50))
                     title_para = Paragraph(f"{type_system_name} For The Workplace<br/>Team Report", cover_title_style)
                     cov_elems.append(title_para)
-
-                    cov_elems.append(Spacer(1, 50))
-
+                    cov_elems.append(Spacer(1,50))
                     sep = HRFlowable(width="70%", color=colors.darkgoldenrod)
                     cov_elems.append(sep)
-                    cov_elems.append(Spacer(1, 20))
-
-                    comp_para = Paragraph(company_name, cover_text_style)
-                    cov_elems.append(comp_para)
-                    tm_para = Paragraph(team_name, cover_text_style)
-                    cov_elems.append(tm_para)
-                    dt_para = Paragraph(date_str, cover_text_style)
-                    cov_elems.append(dt_para)
-
-                    cov_elems.append(Spacer(1, 60))
+                    cov_elems.append(Spacer(1,20))
+                    comp_p = Paragraph(company_name, cover_text_style)
+                    cov_elems.append(comp_p)
+                    tm_p = Paragraph(team_name, cover_text_style)
+                    cov_elems.append(tm_p)
+                    dt_p = Paragraph(date_str, cover_text_style)
+                    cov_elems.append(dt_p)
+                    cov_elems.append(Spacer(1,60))
                     cov_elems.append(PageBreak())
                     return cov_elems
+
+                from reportlab.platypus import Image as RepImage
 
                 def convert_markdown_to_pdf(
                     report_dict,
                     distribution_plot,
-                    preference_plots_dict,
+                    pref_plots,
                     logo_path,
                     company_name,
                     team_name,
                     date_str
                 ):
-                    pdf_buf = io.BytesIO()
-                    doc = SimpleDocTemplate(pdf_buf, pagesize=letter)
-                    elems = []
+                    pdf_buffer = io.BytesIO()
+                    doc = SimpleDocTemplate(pdf_buffer, pagesize=letter)
+                    elements = []
 
-                    # Add cover
+                    # Cover
                     cover_page = build_cover_page(
-                        logo_path=logo_path,
-                        type_system_name="TypeFinder",
-                        company_name=company_name,
-                        team_name=team_name,
-                        date_str=date_str
+                        logo_path, "TypeFinder", company_name, team_name, date_str
                     )
-                    elems.extend(cover_page)
+                    elements.extend(cover_page)
 
-                    # Normal styles
                     styles = getSampleStyleSheet()
                     styleH1 = ParagraphStyle(
                         'Heading1Custom',
@@ -620,32 +546,31 @@ if st.button("Generate Report from CSV"):
                         leftIndent=20,
                     )
 
-                    def process_md(md_text):
+                    def process_markdown(md_text):
                         html = markdown(md_text, extras=['tables'])
                         soup = BeautifulSoup(html, 'html.parser')
                         for elem in soup.contents:
                             if isinstance(elem, str):
                                 continue
-
                             if elem.name == 'h1':
-                                elems.append(Paragraph(elem.text, styleH1))
-                                elems.append(Spacer(1,12))
+                                elements.append(Paragraph(elem.text, styleH1))
+                                elements.append(Spacer(1,12))
                             elif elem.name == 'h2':
-                                elems.append(Paragraph(elem.text, styleH2))
-                                elems.append(Spacer(1,12))
+                                elements.append(Paragraph(elem.text, styleH2))
+                                elements.append(Spacer(1,12))
                             elif elem.name == 'h3':
-                                elems.append(Paragraph(elem.text, styleH3))
-                                elems.append(Spacer(1,12))
+                                elements.append(Paragraph(elem.text, styleH3))
+                                elements.append(Spacer(1,12))
                             elif elem.name == 'h4':
-                                elems.append(Paragraph(elem.text, styleH4))
-                                elems.append(Spacer(1,12))
+                                elements.append(Paragraph(elem.text, styleH4))
+                                elements.append(Spacer(1,12))
                             elif elem.name == 'p':
-                                elems.append(Paragraph(elem.decode_contents(), styleN))
-                                elems.append(Spacer(1,12))
+                                elements.append(Paragraph(elem.decode_contents(), styleN))
+                                elements.append(Spacer(1,12))
                             elif elem.name == 'ul':
                                 for li in elem.find_all('li', recursive=False):
-                                    elems.append(Paragraph('• ' + li.text, styleList))
-                                    elems.append(Spacer(1,6))
+                                    elements.append(Paragraph('• ' + li.text, styleList))
+                                    elements.append(Spacer(1,6))
                             elif elem.name == 'table':
                                 table_data = []
                                 thead = elem.find('thead')
@@ -665,49 +590,48 @@ if st.button("Generate Report from CSV"):
                                     table_row = [c.get_text(strip=True) for c in cols]
                                     table_data.append(table_row)
                                 if table_data:
-                                    t = Table(table_data, hAlign='LEFT')
-                                    t.setStyle(TableStyle([
-                                        ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
-                                        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-                                        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-                                        ('FONTNAME', (0, 0), (-1, 0), 'Times-Bold'),
-                                        ('FONTNAME', (0, 1), (-1, -1), 'Times-Roman'),
-                                        ('BOTTOMPADDING', (0,0), (-1,0),12),
-                                        ('GRID', (0,0), (-1,-1), 1, colors.black),
+                                    tb = Table(table_data, hAlign='LEFT')
+                                    tb.setStyle(TableStyle([
+                                        ('BACKGROUND',(0,0),(-1,0),colors.grey),
+                                        ('TEXTCOLOR',(0,0),(-1,0),colors.whitesmoke),
+                                        ('ALIGN',(0,0),(-1,-1),'CENTER'),
+                                        ('FONTNAME',(0,0),(-1,0),'Times-Bold'),
+                                        ('FONTNAME',(0,1),(-1,-1),'Times-Roman'),
+                                        ('BOTTOMPADDING',(0,0),(-1,0),12),
+                                        ('GRID',(0,0),(-1,-1),1,colors.black),
                                     ]))
-                                    elems.append(t)
-                                    elems.append(Spacer(1,12))
+                                    elements.append(tb)
+                                    elements.append(Spacer(1,12))
                             else:
-                                elems.append(Paragraph(elem.get_text(strip=True), styleN))
-                                elems.append(Spacer(1,12))
+                                elements.append(Paragraph(elem.get_text(strip=True), styleN))
+                                elements.append(Spacer(1,12))
 
                     for s in ["Intro_and_Type_Distribution","Analysis of Dimension Preferences",
                               "Team Insights","Next Steps"]:
-                        process_md(report_dict[s])
+                        process_markdown(report_dict[s])
                         if s == "Intro_and_Type_Distribution":
-                            elems.append(Spacer(1,12))
-                            img_buf = io.BytesIO(distribution_plot)
-                            img = ReportLabImage(img_buf, width=400, height=240)
-                            elems.append(img)
-                            elems.append(Spacer(1,12))
+                            elements.append(Spacer(1,12))
+                            dist_buf = io.BytesIO(distribution_plot)
+                            dist_img = ReportLabImage(dist_buf, width=400, height=240)
+                            elements.append(dist_img)
+                            elements.append(Spacer(1,12))
                         if s == "Analysis of Dimension Preferences":
                             for pair in [('E','I'),('S','N'),('T','F'),('J','P')]:
-                                elems.append(Spacer(1,12))
-                                elems.append(Paragraph(f"{pair[0]} vs {pair[1]} Preference Distribution", styleH2))
-                                pimg_buf = io.BytesIO(preference_plots_dict[''.join(pair)])
-                                pimg = ReportLabImage(pimg_buf, width=300, height=300)
-                                elems.append(pimg)
-                                elems.append(Spacer(1,12))
+                                elements.append(Spacer(1,12))
+                                elements.append(Paragraph(f"{pair[0]} vs {pair[1]} Preference Distribution", styleH2))
+                                pfBuf = io.BytesIO(pref_plots[''.join(pair)])
+                                pfImg = ReportLabImage(pfBuf, width=300, height=300)
+                                elements.append(pfImg)
+                                elements.append(Spacer(1,12))
 
-                    doc.build(elems)
-                    pdf_buf.seek(0)
-                    return pdf_buf
+                    doc.build(elements)
+                    pdf_buffer.seek(0)
+                    return pdf_buffer
 
-                # Build final PDF
                 pdf_data = convert_markdown_to_pdf(
                     report_dict=report_sections,
                     distribution_plot=type_distribution_plot,
-                    preference_plots_dict=preference_plots,
+                    pref_plots=preference_plots,
                     logo_path=logo_path,
                     company_name=company_name,
                     team_name=team_name,
