@@ -427,7 +427,9 @@ if st.button('Generate Report'):
             
                 # Logo (now 280×104)
                 try:
-                    logo = ReportLabImage(logo_path, width=280, height=104)
+                    cover_elems.append(Spacer(1, 20))  # smaller spacer at the top
+
+                    logo = ReportLabImage(logo_path, width=140, height=52)  # half size, same ratio
                     cover_elems.append(logo)
                 except:
                     pass
@@ -479,9 +481,6 @@ if st.button('Generate Report'):
                     date_str=date_str
                 )
                 elements.extend(cover_page)
-
-                # 2) Add some space before the actual content
-                elements.append(Spacer(1, 40))
 
                 # The usual styling
                 styles = getSampleStyleSheet()
