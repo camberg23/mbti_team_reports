@@ -41,7 +41,7 @@ def parse_tf_type(tf_str: str) -> str:
     """Return a valid 4-letter TypeFinder code if recognized, else empty."""
     if not tf_str:
         return ""
-    tf_str = tf_str.strip().upper()
+    tf_str = str(tf_str).strip().upper()
     if tf_str in typefinder_types:
         return tf_str
     return ""
