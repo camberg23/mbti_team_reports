@@ -14,13 +14,15 @@ from reportlab.platypus import (
     Image as ReportLabImage,
     Table,
     TableStyle,
+    HRFlowable
 )
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.pagesizes import letter
-from reportlab.lib.enums import TA_LEFT
+from reportlab.lib.enums import TA_LEFT, TA_CENTER
 from reportlab.lib import colors
 from markdown2 import markdown
 from bs4 import BeautifulSoup
+import datetime
 
 # -----------------------------------------------------------------------------------
 # TypeFinder Types (16 variations)
@@ -82,7 +84,6 @@ Follow these guidelines:
 """
 
 prompts = {
-    # We add a {NOT_ON_TEAM_LIST} marker here so we can pass absent types to the LLM:
     "Intro_and_Type_Distribution": """
 {INITIAL_CONTEXT}
 
@@ -192,6 +193,15 @@ Write **Section 4: Next Steps**.
 
 st.title('TypeFinder Team Report Generator (Intro + Distribution Combined)')
 
+# Let user specify custom cover page info
+st.subheader("Cover Page Details")
+logo_path = "logo.png"  # You said the logo is in the root as logo.png
+company_name = st.text_input("Company Name (for cover page)", "Channing Realty")
+team_name = st.text_input("Team Name (for cover page)", "Marketing Team")
+today_str = datetime.date.today().strftime("%B %d, %Y")
+custom_date = st.text_input("Date (for cover page)", today_str)
+
+st.subheader("Report Configuration")
 if 'team_size' not in st.session_state:
     st.session_state['team_size'] = 5
 
@@ -254,7 +264,6 @@ if st.button('Generate Report'):
                 preference_breakdowns += f"- {b}: {preference_counts[b]} members ({preference_percentages[b]}%)\n\n"
 
             # Count TypeFinder type distribution
-            from collections import Counter
             type_counts = Counter(team_typefinder_types)
             type_percentages = {
                 k: round((v / total_members) * 100)
@@ -318,7 +327,6 @@ if st.button('Generate Report'):
                 plt.close()
 
             # Prepare LLM
-            from langchain_community.chat_models import ChatOpenAI
             chat_model = ChatOpenAI(
                 openai_api_key=st.secrets['API_KEY'],
                 model_name='gpt-4o-2024-08-06',
@@ -326,7 +334,6 @@ if st.button('Generate Report'):
             )
 
             # Format the initial context
-            from langchain.prompts import PromptTemplate
             initial_context_template = PromptTemplate.from_template(initial_context)
             formatted_initial_context = initial_context_template.format(
                 TEAM_SIZE=str(team_size),
@@ -339,11 +346,7 @@ if st.button('Generate Report'):
             report_sections = {}
             report_so_far = ""
 
-            # We now have 4 sections:
-            # 1) Intro_and_Type_Distribution
-            # 2) Analysis of Dimension Preferences
-            # 3) Team Insights
-            # 4) Next Steps
+            # 4 sections
             section_names = [
                 "Intro_and_Type_Distribution",
                 "Analysis of Dimension Preferences",
@@ -352,7 +355,6 @@ if st.button('Generate Report'):
             ]
 
             for section_name in section_names:
-                # If we're generating Intro + Distribution, pass in the list of absent types:
                 if section_name == "Intro_and_Type_Distribution":
                     prompt_template = PromptTemplate.from_template(prompts[section_name])
                     prompt_vars = {
@@ -367,7 +369,6 @@ if st.button('Generate Report'):
                         "REPORT_SO_FAR": report_so_far.strip()
                     }
 
-                from langchain.chains import LLMChain
                 chain = LLMChain(prompt=prompt_template, llm=chat_model)
                 section_text = chain.run(**prompt_vars)
                 report_sections[section_name] = section_text.strip()
@@ -376,26 +377,114 @@ if st.button('Generate Report'):
             # Display the final text in Streamlit
             for s_name in section_names:
                 st.markdown(report_sections[s_name])
-                # Show distribution plot after "Intro_and_Type_Distribution"
                 if s_name == "Intro_and_Type_Distribution":
                     st.header("Type Distribution Plot")
                     st.image(type_distribution_plot, use_column_width=True)
-                # Show preference pie charts after "Analysis of Dimension Preferences"
                 if s_name == "Analysis of Dimension Preferences":
                     for pair in [('E','I'), ('S','N'), ('T','F'), ('J','P')]:
                         key = ''.join(pair)
                         st.header(f"{pair[0]} vs {pair[1]} Preference Distribution")
                         st.image(preference_plots[key], use_column_width=True)
 
-            # ----------------------------------------------------
-            # PDF Generation
-            # ----------------------------------------------------
-            def convert_markdown_to_pdf(report_dict, dist_plot, pref_plots):
+            # -------------------------------------------------------------------
+            # Cover Page + PDF Generation
+            # -------------------------------------------------------------------
+
+            def build_cover_page(logo_path, type_system_name, company_name, team_name, date_str):
+                """Return a list of Flowable elements that make up the cover page."""
+                cover_elems = []
+
+                styles = getSampleStyleSheet()
+
+                # Title style
+                cover_title_style = ParagraphStyle(
+                    'CoverTitle',
+                    parent=styles['Title'],
+                    fontName='Times-Bold',
+                    fontSize=24,
+                    leading=28,
+                    alignment=TA_CENTER,
+                    spaceAfter=20
+                )
+
+                # Subtitle style
+                cover_subtitle_style = ParagraphStyle(
+                    'CoverSubtitle',
+                    parent=styles['Title'],
+                    fontName='Times-Bold',
+                    fontSize=18,
+                    leading=22,
+                    alignment=TA_CENTER,
+                    spaceAfter=10
+                )
+
+                # Normal center
+                cover_text_style = ParagraphStyle(
+                    'CoverText',
+                    parent=styles['Normal'],
+                    fontName='Times-Roman',
+                    fontSize=14,
+                    alignment=TA_CENTER,
+                    spaceAfter=8
+                )
+
+                cover_elems.append(Spacer(1, 80))
+
+                # Logo
+                try:
+                    logo = ReportLabImage(logo_path, width=100, height=100)
+                    cover_elems.append(logo)
+                except:
+                    pass
+
+                cover_elems.append(Spacer(1, 50))
+
+                # TypeFinder For The Workplace + Team Report
+                title_para = Paragraph(f"{type_system_name} For The Workplace<br/>Team Report", cover_title_style)
+                cover_elems.append(title_para)
+                
+                cover_elems.append(Spacer(1, 50))
+                # A small line separator
+                sep = HRFlowable(width="70%", color=colors.darkgoldenrod)
+                cover_elems.append(sep)
+                cover_elems.append(Spacer(1, 20))
+
+                # Company, Team, Date
+                company_para = Paragraph(company_name, cover_text_style)
+                cover_elems.append(company_para)
+                team_para = Paragraph(team_name, cover_text_style)
+                cover_elems.append(team_para)
+                date_para = Paragraph(date_str, cover_text_style)
+                cover_elems.append(date_para)
+
+                cover_elems.append(Spacer(1, 60))
+
+                return cover_elems
+
+            def convert_markdown_to_pdf(
+                report_dict, dist_plot, pref_plots,
+                logo_path, company_name, team_name, date_str
+            ):
                 pdf_buffer = io.BytesIO()
                 doc = SimpleDocTemplate(pdf_buffer, pagesize=letter)
                 elements = []
-                styles = getSampleStyleSheet()
 
+                # 1) Build cover page
+                # Note: We'll just call the framework "TypeFinder"
+                cover_page = build_cover_page(
+                    logo_path=logo_path,
+                    type_system_name="TypeFinder",
+                    company_name=company_name,
+                    team_name=team_name,
+                    date_str=date_str
+                )
+                elements.extend(cover_page)
+
+                # 2) Add some space before the actual content
+                elements.append(Spacer(1, 40))
+
+                # The usual styling
+                styles = getSampleStyleSheet()
                 styleH1 = ParagraphStyle(
                     'Heading1Custom',
                     parent=styles['Heading1'],
@@ -445,17 +534,14 @@ if st.button('Generate Report'):
                     leftIndent=20,
                 )
 
-                from markdown2 import markdown
-                soup_maker = BeautifulSoup
-
                 def process_markdown(md_text):
                     html = markdown(md_text, extras=['tables'])
-                    soup = soup_maker(html, 'html.parser')
+                    soup = BeautifulSoup(html, 'html.parser')
                     for elem in soup.contents:
                         if isinstance(elem, str):
                             continue
 
-                        # Handle table
+                        # Table?
                         if elem.name == 'table':
                             table_data = []
                             thead = elem.find('thead')
@@ -472,7 +558,7 @@ if st.button('Generate Report'):
                                 rows = elem.find_all('tr')
                             for row in rows:
                                 cols = row.find_all(['td','th'])
-                                table_row = [col.get_text(strip=True) for col in cols]
+                                table_row = [c.get_text(strip=True) for c in cols]
                                 table_data.append(table_row)
                             if table_data:
                                 t = Table(table_data, hAlign='LEFT')
@@ -500,22 +586,18 @@ if st.button('Generate Report'):
                         elif elem.name == 'h4':
                             elements.append(Paragraph(elem.text, styleH4))
                             elements.append(Spacer(1,12))
-
                         elif elem.name == 'p':
                             elements.append(Paragraph(elem.decode_contents(), styleN))
                             elements.append(Spacer(1,12))
-
                         elif elem.name == 'ul':
                             for li in elem.find_all('li', recursive=False):
                                 elements.append(Paragraph('• ' + li.text, styleList))
                                 elements.append(Spacer(1,6))
-
                         else:
-                            # Fallback for other tags
                             elements.append(Paragraph(elem.get_text(strip=True), styleN))
                             elements.append(Spacer(1,12))
 
-                # Build PDF from each of the 4 sections
+                # Now process each of the 4 sections
                 for s_name in [
                     "Intro_and_Type_Distribution",
                     "Analysis of Dimension Preferences",
@@ -545,7 +627,16 @@ if st.button('Generate Report'):
                 pdf_buffer.seek(0)
                 return pdf_buffer
 
-            pdf_data = convert_markdown_to_pdf(report_sections, type_distribution_plot, preference_plots)
+            # Create the PDF with cover page
+            pdf_data = convert_markdown_to_pdf(
+                report_sections,
+                type_distribution_plot,
+                preference_plots,
+                logo_path=logo_path,
+                company_name=company_name,
+                team_name=team_name,
+                date_str=custom_date
+            )
 
             st.download_button(
                 label="Download Report as PDF",
