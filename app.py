@@ -17,6 +17,7 @@ from reportlab.platypus import (
     HRFlowable
 )
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.platypus import PageBreak
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.enums import TA_LEFT, TA_CENTER
 from reportlab.lib import colors
@@ -389,13 +390,17 @@ if st.button('Generate Report'):
             # -------------------------------------------------------------------
             # Cover Page + PDF Generation
             # -------------------------------------------------------------------
-
             def build_cover_page(logo_path, type_system_name, company_name, team_name, date_str):
-                """Return a list of Flowable elements that make up the cover page."""
+                from reportlab.platypus import (
+                    Spacer, Paragraph, Image as ReportLabImage, HRFlowable
+                )
+                from reportlab.lib.enums import TA_CENTER
+                from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+                from reportlab.lib import colors
+            
                 cover_elems = []
-
                 styles = getSampleStyleSheet()
-
+            
                 # Title style
                 cover_title_style = ParagraphStyle(
                     'CoverTitle',
@@ -406,19 +411,8 @@ if st.button('Generate Report'):
                     alignment=TA_CENTER,
                     spaceAfter=20
                 )
-
-                # Subtitle style
-                cover_subtitle_style = ParagraphStyle(
-                    'CoverSubtitle',
-                    parent=styles['Title'],
-                    fontName='Times-Bold',
-                    fontSize=18,
-                    leading=22,
-                    alignment=TA_CENTER,
-                    spaceAfter=10
-                )
-
-                # Normal center
+            
+                # Normal center style
                 cover_text_style = ParagraphStyle(
                     'CoverText',
                     parent=styles['Normal'],
@@ -427,28 +421,30 @@ if st.button('Generate Report'):
                     alignment=TA_CENTER,
                     spaceAfter=8
                 )
-
+            
+                # Spacer at the top
                 cover_elems.append(Spacer(1, 80))
-
-                # Logo
+            
+                # Logo (now 280×104)
                 try:
-                    logo = ReportLabImage(logo_path, width=100, height=100)
+                    logo = ReportLabImage(logo_path, width=280, height=104)
                     cover_elems.append(logo)
                 except:
                     pass
-
+            
                 cover_elems.append(Spacer(1, 50))
-
-                # TypeFinder For The Workplace + Team Report
+            
+                # "TypeFinder For The Workplace" + "Team Report"
                 title_para = Paragraph(f"{type_system_name} For The Workplace<br/>Team Report", cover_title_style)
                 cover_elems.append(title_para)
-                
+            
                 cover_elems.append(Spacer(1, 50))
-                # A small line separator
+            
+                # Horizontal line separator
                 sep = HRFlowable(width="70%", color=colors.darkgoldenrod)
                 cover_elems.append(sep)
                 cover_elems.append(Spacer(1, 20))
-
+            
                 # Company, Team, Date
                 company_para = Paragraph(company_name, cover_text_style)
                 cover_elems.append(company_para)
@@ -456,10 +452,14 @@ if st.button('Generate Report'):
                 cover_elems.append(team_para)
                 date_para = Paragraph(date_str, cover_text_style)
                 cover_elems.append(date_para)
-
+            
                 cover_elems.append(Spacer(1, 60))
-
+            
+                # Ensure the next section starts on a new page
+                cover_elems.append(PageBreak())
+            
                 return cover_elems
+
 
             def convert_markdown_to_pdf(
                 report_dict, dist_plot, pref_plots,
