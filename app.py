@@ -201,7 +201,7 @@ Write **Section 4: Next Steps**.
 # Streamlit App
 # -----------------------------------------------------------------------------------
 
-st.title('TypeFinder Team Report Generator (CSV-based, fractional dimension data)')
+st.title('TypeFinder Team Report Generator')
 
 st.subheader("Cover Page Details")
 logo_path = "truity_logo.png"
@@ -210,7 +210,7 @@ team_name = st.text_input("Team Name (for cover page)", "Marketing Team")
 today_str = datetime.date.today().strftime("%B %d, %Y")
 custom_date = st.text_input("Date (for cover page)", today_str)
 
-st.subheader("Upload CSV with columns: User Name, TF Type, TF E/I, TF N/S, TF F/T, TF J/P")
+st.subheader("Upload CSV")
 csv_file = st.file_uploader("Choose a CSV file", type=["csv"])
 
 if st.button("Generate Report from CSV"):
