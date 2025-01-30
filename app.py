@@ -205,8 +205,8 @@ st.title('TypeFinder Team Report Generator')
 
 st.subheader("Cover Page Details")
 logo_path = "truity_logo.png"
-company_name = st.text_input("Company Name (for cover page)", "Channing Realty")
-team_name = st.text_input("Team Name (for cover page)", "Marketing Team")
+company_name = st.text_input("Company Name (for cover page)", "")
+team_name = st.text_input("Team Name (for cover page)", "")
 today_str = datetime.date.today().strftime("%B %d, %Y")
 custom_date = st.text_input("Date (for cover page)", today_str)
 
