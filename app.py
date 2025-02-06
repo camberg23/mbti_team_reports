@@ -31,7 +31,7 @@ from langchain.chains import LLMChain
 # -----------------------------------------------------------------------------------
 # Enhanced Plotting Functions (for TypeFinder / MBTI)
 # -----------------------------------------------------------------------------------
-def _generate_pie_chart(data, slices):
+def _generate_pie_chart(data, slices, scaling_factor=1.6):
     # Filter out slices with 0 counts
     filtered_slices = [s for s in slices if data.get(s['label'], 0) > 0]
 
@@ -49,7 +49,7 @@ def _generate_pie_chart(data, slices):
         angle = proportion * 360
         s['theta1'] = current_angle
         s['theta2'] = current_angle + angle
-        s['radius'] = 1.0 + proportion * 1.6  # Exaggerate radius based on proportion
+        s['radius'] = 1.0 + proportion * scaling_factor  # Adjust radius based on scaling_factor
         current_angle += angle
 
     # Plot the chart
@@ -75,9 +75,9 @@ def _generate_pie_chart(data, slices):
             ha='center', va='center', fontsize=12, color=s['color'], fontweight='bold'
         )
 
-    # Final touches
-    ax.set_xlim(-2, 2)
-    ax.set_ylim(-2, 2)
+    # Final touches: Adjust the limits to ensure nothing is cut off
+    ax.set_xlim(-2.5, 2.5)
+    ax.set_ylim(-2.5, 2.5)
     ax.set_aspect('equal')
     ax.axis('off')
     plt.tight_layout()
@@ -99,7 +99,8 @@ def plot_mbti_chart(data):
         {'label': 'ESFP', 'color': '#FFCC00'}, {'label': 'ISFJ', 'color': '#8FA14F'},
         {'label': 'ISTJ', 'color': '#B8682E'}, {'label': 'ENFJ', 'color': '#F98274'}
     ]
-    return _generate_pie_chart(data, slices)
+    # Use the default (more exploded) scaling factor for the main type distribution
+    return _generate_pie_chart(data, slices, scaling_factor=1.6)
 
 def plot_preference_chart(pair, counts):
     # Define color schemes for each preference pair
@@ -114,7 +115,8 @@ def plot_preference_chart(pair, counts):
     else:
         slices = []
     data = {pair[0]: counts[pair[0]], pair[1]: counts[pair[1]]}
-    return _generate_pie_chart(data, slices)
+    # Use a lower scaling factor so the preference charts don't get cut off
+    return _generate_pie_chart(data, slices, scaling_factor=0.8)
 
 # -----------------------------------------------------------------------------------
 # Valid TypeFinder Types (16 variations)
@@ -178,7 +180,6 @@ Follow these guidelines:
 """
 
 prompts = {
-    # NOTE: We add instructions about naming each user in "Types on the Team"
     "Intro_and_Type_Distribution": """
 {INITIAL_CONTEXT}
 
@@ -207,7 +208,6 @@ Write **Section 1: Intro & Type Distribution** as a single combined section.
 **Begin your combined section below:**
 """,
 
-    # NOTE: We add instructions to reference fractional sums explicitly
     "Analysis of Dimension Preferences": """
 {INITIAL_CONTEXT}
 
@@ -358,7 +358,7 @@ if st.button("Generate Report from CSV"):
                         dimension_sums['N'] += n_frac
                         dimension_sums['S'] += s_frac
 
-                        f_frac = fFloat/100.0
+                        f_frac = fF/100.0   # Fixed: use fF from tuple, not fFloat
                         t_frac = 1 - f_frac
                         dimension_sums['F'] += f_frac
                         dimension_sums['T'] += t_frac
@@ -374,7 +374,7 @@ if st.button("Generate Report from CSV"):
 
                 # scale if partial dimension data
                 if dimension_rows_count > 0:
-                    scale_factor = float(total_members)/dimension_rows_count
+                    scale_factor = float(total_members) / dimension_rows_count
                 else:
                     scale_factor = 1.0
 
@@ -382,28 +382,28 @@ if st.button("Generate Report from CSV"):
                     dimension_sums[k] *= scale_factor
 
                 # Round to get "counts"
-                preference_counts = {k: round(v) for k,v in dimension_sums.items()}
+                preference_counts = {k: round(v) for k, v in dimension_sums.items()}
 
                 # Convert to pair-based percentages
-                def pair_percent(a,b):
+                def pair_percent(a, b):
                     s = preference_counts[a] + preference_counts[b]
-                    if s <= 0: return (0,0)
-                    pa = round((preference_counts[a]/s)*100)
+                    if s <= 0: return (0, 0)
+                    pa = round((preference_counts[a] / s) * 100)
                     pb = 100 - pa
-                    return (pa,pb)
+                    return (pa, pb)
 
                 final_pref_counts = {}
                 final_pref_pcts = {}
-                for pair in [('E','I'),('S','N'),('T','F'),('J','P')]:
+                for pair in [('E','I'), ('S','N'), ('T','F'), ('J','P')]:
                     a, b = pair
                     final_pref_counts[a] = preference_counts[a]
                     final_pref_counts[b] = preference_counts[b]
-                    pa, pb = pair_percent(a,b)
+                    pa, pb = pair_percent(a, b)
                     final_pref_pcts[a] = pa
                     final_pref_pcts[b] = pb
 
                 preference_breakdowns = ""
-                for pair in [('E','I'),('S','N'),('T','F'),('J','P')]:
+                for pair in [('E','I'), ('S','N'), ('T','F'), ('J','P')]:
                     a, b = pair
                     preference_breakdowns += f"**{a} vs {b}**\n"
                     preference_breakdowns += f"- {a}: {final_pref_counts[a]} members ({final_pref_pcts[a]}%)\n"
@@ -411,7 +411,7 @@ if st.button("Generate Report from CSV"):
 
                 # Type distribution breakdown
                 type_counts = Counter(type_list)
-                type_percentages = {t: round((c/total_members)*100) for t,c in type_counts.items()}
+                type_percentages = {t: round((c / total_members) * 100) for t, c in type_counts.items()}
                 absent_types = [t for t in typefinder_types if t not in type_counts]
                 not_on_team_list_str = ""
                 if absent_types:
@@ -430,7 +430,7 @@ if st.button("Generate Report from CSV"):
 
                 # Enhanced preference pie charts using the new plotting function
                 preference_plots = {}
-                for pair in [('E','I'),('S','N'),('T','F'),('J','P')]:
+                for pair in [('E','I'), ('S','N'), ('T','F'), ('J','P')]:
                     plot_img = plot_preference_chart(pair, final_pref_counts)
                     preference_plots[''.join(pair)] = plot_img
 
@@ -485,7 +485,7 @@ if st.button("Generate Report from CSV"):
                         st.header("Type Distribution Plot")
                         st.image(type_distribution_plot, use_column_width=True)
                     if sec == "Analysis of Dimension Preferences":
-                        for pair in [('E','I'),('S','N'),('T','F'),('J','P')]:
+                        for pair in [('E','I'), ('S','N'), ('T','F'), ('J','P')]:
                             st.header(f"{pair[0]} vs {pair[1]} Preference Distribution")
                             st.image(preference_plots[''.join(pair)], use_column_width=True)
 
@@ -510,27 +510,27 @@ if st.button("Generate Report from CSV"):
                         alignment=TA_CENTER,
                         spaceAfter=8
                     )
-                    cov_elems.append(Spacer(1,80))
+                    cov_elems.append(Spacer(1, 80))
                     try:
                         lg = RepImage(logo_path, width=140, height=52)
                     except:
                         lg = None
                     if lg:
                         cov_elems.append(lg)
-                    cov_elems.append(Spacer(1,50))
+                    cov_elems.append(Spacer(1, 50))
                     title_para = Paragraph(f"{type_system_name} For The Workplace<br/>Team Report", cover_title_style)
                     cov_elems.append(title_para)
-                    cov_elems.append(Spacer(1,50))
+                    cov_elems.append(Spacer(1, 50))
                     sep = HRFlowable(width="70%", color=colors.darkgoldenrod)
                     cov_elems.append(sep)
-                    cov_elems.append(Spacer(1,20))
+                    cov_elems.append(Spacer(1, 20))
                     comp_p = Paragraph(company_name, cover_text_style)
                     cov_elems.append(comp_p)
                     tm_p = Paragraph(team_name, cover_text_style)
                     cov_elems.append(tm_p)
                     dt_p = Paragraph(date_str, cover_text_style)
                     cov_elems.append(dt_p)
-                    cov_elems.append(Spacer(1,60))
+                    cov_elems.append(Spacer(1, 60))
                     cov_elems.append(PageBreak())
                     return cov_elems
 
@@ -612,23 +612,23 @@ if st.button("Generate Report from CSV"):
                                 continue
                             if elem.name == 'h1':
                                 elements.append(Paragraph(elem.text, styleH1))
-                                elements.append(Spacer(1,12))
+                                elements.append(Spacer(1, 12))
                             elif elem.name == 'h2':
                                 elements.append(Paragraph(elem.text, styleH2))
-                                elements.append(Spacer(1,12))
+                                elements.append(Spacer(1, 12))
                             elif elem.name == 'h3':
                                 elements.append(Paragraph(elem.text, styleH3))
-                                elements.append(Spacer(1,12))
+                                elements.append(Spacer(1, 12))
                             elif elem.name == 'h4':
                                 elements.append(Paragraph(elem.text, styleH4))
-                                elements.append(Spacer(1,12))
+                                elements.append(Spacer(1, 12))
                             elif elem.name == 'p':
                                 elements.append(Paragraph(elem.decode_contents(), styleN))
-                                elements.append(Spacer(1,12))
+                                elements.append(Spacer(1, 12))
                             elif elem.name == 'ul':
                                 for li in elem.find_all('li', recursive=False):
                                     elements.append(Paragraph('• ' + li.text, styleList))
-                                    elements.append(Spacer(1,6))
+                                    elements.append(Spacer(1, 6))
                             elif elem.name == 'table':
                                 table_data = []
                                 thead = elem.find('thead')
@@ -644,45 +644,45 @@ if st.button("Generate Report from CSV"):
                                 else:
                                     rows = elem.find_all('tr')
                                 for row in rows:
-                                    cols = row.find_all(['td','th'])
+                                    cols = row.find_all(['td', 'th'])
                                     table_row = [c.get_text(strip=True) for c in cols]
                                     table_data.append(table_row)
                                 if table_data:
                                     tb = Table(table_data, hAlign='LEFT')
                                     tb.setStyle(TableStyle([
-                                        ('BACKGROUND',(0,0),(-1,0),colors.grey),
-                                        ('TEXTCOLOR',(0,0),(-1,0),colors.whitesmoke),
-                                        ('ALIGN',(0,0),(-1,-1),'CENTER'),
-                                        ('FONTNAME',(0,0),(-1,0),'Times-Bold'),
-                                        ('FONTNAME',(0,1),(-1,-1),'Times-Roman'),
-                                        ('BOTTOMPADDING',(0,0),(-1,0),12),
-                                        ('GRID',(0,0),(-1,-1),1,colors.black),
+                                        ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+                                        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                                        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                                        ('FONTNAME', (0, 0), (-1, 0), 'Times-Bold'),
+                                        ('FONTNAME', (0, 1), (-1, -1), 'Times-Roman'),
+                                        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+                                        ('GRID', (0, 0), (-1, -1), 1, colors.black),
                                     ]))
                                     elements.append(tb)
-                                    elements.append(Spacer(1,12))
+                                    elements.append(Spacer(1, 12))
                             else:
                                 elements.append(Paragraph(elem.get_text(strip=True), styleN))
-                                elements.append(Spacer(1,12))
+                                elements.append(Spacer(1, 12))
 
-                    for s in ["Intro_and_Type_Distribution","Analysis of Dimension Preferences",
-                              "Team Insights","Next Steps"]:
+                    for s in ["Intro_and_Type_Distribution", "Analysis of Dimension Preferences",
+                              "Team Insights", "Next Steps"]:
                         process_markdown(report_dict[s])
                         if s == "Intro_and_Type_Distribution":
-                            elements.append(Spacer(1,12))
+                            elements.append(Spacer(1, 12))
                             dist_buf = io.BytesIO(distribution_plot)
-                            # Adjusted size: using a square container to prevent vertical smushing.
+                            # Use a square container sized to 400x400 so nothing is cut off
                             dist_img = ReportLabImage(dist_buf, width=400, height=400)
                             elements.append(dist_img)
-                            elements.append(Spacer(1,12))
+                            elements.append(Spacer(1, 12))
                         if s == "Analysis of Dimension Preferences":
-                            for pair in [('E','I'),('S','N'),('T','F'),('J','P')]:
-                                elements.append(Spacer(1,12))
+                            for pair in [('E','I'), ('S','N'), ('T','F'), ('J','P')]:
+                                elements.append(Spacer(1, 12))
                                 elements.append(Paragraph(f"{pair[0]} vs {pair[1]} Preference Distribution", styleH2))
                                 pfBuf = io.BytesIO(pref_plots[''.join(pair)])
-                                # Reduced size to ensure the image fits within the container.
+                                # Ensure the preference image fits inside its container
                                 pfImg = ReportLabImage(pfBuf, width=250, height=250)
                                 elements.append(pfImg)
-                                elements.append(Spacer(1,12))
+                                elements.append(Spacer(1, 12))
 
                     doc.build(elements)
                     pdf_buffer.seek(0)
@@ -704,7 +704,6 @@ if st.button("Generate Report from CSV"):
                     file_name="typefinder_team_report.pdf",
                     mime="application/pdf"
                 )
-
 
 
 # import streamlit as st
