@@ -22,7 +22,7 @@ from reportlab.lib import colors
 from markdown2 import markdown
 from bs4 import BeautifulSoup
 import datetime
-import numpy as np  # NEW: Required for enhanced plotting
+import numpy as np  # Required for enhanced plotting
 
 from langchain_community.chat_models import ChatOpenAI
 from langchain.prompts import PromptTemplate
@@ -68,7 +68,7 @@ def _generate_pie_chart(data, slices):
     # Add labels
     for s in filtered_slices:
         theta_mid = (s['theta1'] + s['theta2']) / 2
-        x = 1.2 * s['radius'] * np.cos(np.radians(theta_mid))  # Adjust label positions closer to slices
+        x = 1.2 * s['radius'] * np.cos(np.radians(theta_mid))
         y = 1.2 * s['radius'] * np.sin(np.radians(theta_mid))
         ax.text(
             x, y, s['label'],
@@ -358,7 +358,7 @@ if st.button("Generate Report from CSV"):
                         dimension_sums['N'] += n_frac
                         dimension_sums['S'] += s_frac
 
-                        f_frac = fF/100.0
+                        f_frac = fFloat/100.0
                         t_frac = 1 - f_frac
                         dimension_sums['F'] += f_frac
                         dimension_sums['T'] += t_frac
@@ -670,7 +670,8 @@ if st.button("Generate Report from CSV"):
                         if s == "Intro_and_Type_Distribution":
                             elements.append(Spacer(1,12))
                             dist_buf = io.BytesIO(distribution_plot)
-                            dist_img = ReportLabImage(dist_buf, width=400, height=240)
+                            # Adjusted size: using a square container to prevent vertical smushing.
+                            dist_img = ReportLabImage(dist_buf, width=400, height=400)
                             elements.append(dist_img)
                             elements.append(Spacer(1,12))
                         if s == "Analysis of Dimension Preferences":
@@ -678,7 +679,8 @@ if st.button("Generate Report from CSV"):
                                 elements.append(Spacer(1,12))
                                 elements.append(Paragraph(f"{pair[0]} vs {pair[1]} Preference Distribution", styleH2))
                                 pfBuf = io.BytesIO(pref_plots[''.join(pair)])
-                                pfImg = ReportLabImage(pfBuf, width=300, height=300)
+                                # Reduced size to ensure the image fits within the container.
+                                pfImg = ReportLabImage(pfBuf, width=250, height=250)
                                 elements.append(pfImg)
                                 elements.append(Spacer(1,12))
 
@@ -702,6 +704,7 @@ if st.button("Generate Report from CSV"):
                     file_name="typefinder_team_report.pdf",
                     mime="application/pdf"
                 )
+
 
 
 # import streamlit as st
