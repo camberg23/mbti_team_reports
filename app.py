@@ -312,11 +312,10 @@ if st.button("Generate Report from CSV"):
             valid_rows = []
             for i, row in df.iterrows():
                 nm_val = row.get("User Name", "")
-                tf_val = row.get("TF Type", "")
-                ei_val = row.get("TF E/I", "")
-                ns_val = row.get("TF N/S", "")
-                ft_val = row.get("TF F/T", "")
-                jp_val = row.get("TF J/P", "")
+                ei_val = row.get("TF Extraversion", "")
+                ns_val = row.get("TF Intuition", "")
+                ft_val = row.get("TF Feeling", "")
+                jp_val = row.get("TF Judging", "")
 
                 name_str = str(nm_val).strip()
                 tf_parsed = parse_tf_type(tf_val)
