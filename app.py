@@ -312,24 +312,28 @@ if st.button("Generate Report from CSV"):
             valid_rows = []
             for i, row in df.iterrows():
                 nm_val = row.get("User Name", "")
+                
+                # This must stay to parse the 16-type code (e.g. "ENFP")
+                tf_val = row.get("TF Type", "")
+                
+                # For numeric columns
                 ei_val = row.get("TF Extraversion", "")
                 ns_val = row.get("TF Intuition", "")
-                ft_val = row.get("TF Feeling", "")
+                feeling_val = row.get("TF Feeling", "")
                 jp_val = row.get("TF Judging", "")
-
+                
                 name_str = str(nm_val).strip()
-                tf_parsed = parse_tf_type(tf_val)
-
+                tf_parsed = parse_tf_type(tf_val)  # uses the 4-letter code
+                
                 if name_str and tf_parsed:
-                    # Try dimension floats
                     try:
                         eFloat = float(ei_val) if ei_val != "" else None
                         nFloat = float(ns_val) if ns_val != "" else None
-                        fFloat = float(ft_val) if ft_val != "" else None
+                        fFloat = float(feeling_val) if feeling_val != "" else None
                         jFloat = float(jp_val) if jp_val != "" else None
                     except:
                         eFloat = nFloat = fFloat = jFloat = None
-
+                
                     valid_rows.append((name_str, tf_parsed, eFloat, nFloat, fFloat, jFloat))
 
             if not valid_rows:
