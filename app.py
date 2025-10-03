@@ -350,28 +350,27 @@ if st.button("Generate Report from CSV"):
                     team_list_str += f"{idx}. {nm}: {code}\n"
                     type_list.append(code)
 
-                    if (eF is not None and nF is not None and fF is not None and jF is not None):
-                        e_frac = eF/100.0
-                        i_frac = 1 - e_frac
-                        dimension_sums['E'] += e_frac
-                        dimension_sums['I'] += i_frac
-
-                        n_frac = nF/100.0
-                        s_frac = 1 - n_frac
-                        dimension_sums['N'] += n_frac
-                        dimension_sums['S'] += s_frac
-
-                        f_frac = fF/100.0   # Fixed: use fF from tuple, not fFloat
-                        t_frac = 1 - f_frac
-                        dimension_sums['F'] += f_frac
-                        dimension_sums['T'] += t_frac
-
-                        j_frac = jF/100.0
-                        p_frac = 1 - j_frac
-                        dimension_sums['J'] += j_frac
-                        dimension_sums['P'] += p_frac
-
-                        dimension_rows_count += 1
+                    # Just use the 4-letter TypeFinder code to increment counts (whole counts, no fractional weighting)
+                    if code:
+                        if code[0] == 'E': 
+                            dimension_sums['E'] += 1
+                        else: 
+                            dimension_sums['I'] += 1
+                    
+                        if code[1] == 'S': 
+                            dimension_sums['S'] += 1
+                        else: 
+                            dimension_sums['N'] += 1
+                    
+                        if code[2] == 'T': 
+                            dimension_sums['T'] += 1
+                        else: 
+                            dimension_sums['F'] += 1
+                    
+                        if code[3] == 'J': 
+                            dimension_sums['J'] += 1
+                        else: 
+                            dimension_sums['P'] += 1
 
                 total_members = len(valid_rows)
 
