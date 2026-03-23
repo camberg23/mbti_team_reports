@@ -222,7 +222,9 @@ Based on the team composition, identify specific development opportunities — b
 
 Then provide 3-5 bullet points that capture the key takeaways. Format each bullet as "• [point]" on its own line.
 
-Do NOT use headers or section titles — just flowing prose followed by bullets for each section."""
+Start Section 1 with the header "**How This Team Works Together**" on its own line, then the paragraphs, then the bullets.
+Start Section 2 with the header "**How the Manager Can Help This Team Grow**" on its own line, then the paragraphs, then the bullets.
+Do not add any other headers or formatting beyond these two."""
 
 BULLET_USER_PROMPT = """{TEAM_DATA}
 
