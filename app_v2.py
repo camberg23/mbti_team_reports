@@ -268,83 +268,13 @@ def generate_summary(api_key: str, team_data: str, user_prompt_template: str) ->
 
 
 # =============================================================================
-# Streamlit App
+# Demo Datasets
 # =============================================================================
 
-st.set_page_config(page_title="Team Summary Generator", layout="wide")
-st.title("Team Summary Generator")
-st.caption("Combined TypeFinder + Enneagram + DISC — lightweight team summaries for Truity at Work")
+import io
 
-st.subheader("Upload CSV")
-st.markdown(
-    "Upload a CSV with columns: `User Name`, `TF Type`, `EG Type`, `DISC Type`. "
-    "Not every member needs all three — the tool uses whatever data is available."
-)
-
-output_mode = st.radio(
-    "Output format",
-    ["Paragraph mode", "Bullet mode", "Both (for comparison)"],
-    help="Paragraph mode: AI picks the most relevant dynamics and writes about them. "
-         "Bullet mode: fixed topic categories with team-specific content for each."
-)
-
-csv_file = st.file_uploader("Choose a CSV file", type=["csv"])
-
-if st.button("Generate Team Summary"):
-    if not csv_file:
-        st.error("Please upload a CSV file first.")
-    else:
-        with st.spinner("Processing..."):
-            df = pd.read_csv(csv_file)
-            members = process_csv(df)
-
-            if not members:
-                st.error("No valid assessment data found in the CSV. "
-                         "Make sure you have columns like 'User Name', 'TF Type', 'EG Type', 'DISC Type'.")
-            else:
-                team_data = build_team_summary_text(members)
-
-                st.subheader("Team Data Summary")
-                with st.expander("View parsed team data", expanded=False):
-                    st.markdown(team_data)
-
-                api_key = st.secrets['API_KEY']
-
-                generate_paragraph = output_mode in ["Paragraph mode", "Both (for comparison)"]
-                generate_bullet = output_mode in ["Bullet mode", "Both (for comparison)"]
-
-                if generate_paragraph:
-                    with st.spinner("Generating paragraph summary..."):
-                        paragraph_result = generate_summary(api_key, team_data, PARAGRAPH_USER_PROMPT)
-
-                    st.subheader("📝 Paragraph Mode")
-                    st.markdown(paragraph_result)
-                    st.download_button(
-                        "Download paragraph summary",
-                        paragraph_result,
-                        file_name="team_summary_paragraph.md",
-                        mime="text/markdown",
-                        key="dl_paragraph"
-                    )
-
-                if generate_bullet:
-                    with st.spinner("Generating bullet summary..."):
-                        bullet_result = generate_summary(api_key, team_data, BULLET_USER_PROMPT)
-
-                    st.subheader("📋 Bullet Mode")
-                    st.markdown(bullet_result)
-                    st.download_button(
-                        "Download bullet summary",
-                        bullet_result,
-                        file_name="team_summary_bullets.md",
-                        mime="text/markdown",
-                        key="dl_bullet"
-                    )
-
-                st.markdown("---")
-                st.caption("Need test data? Download the sample CSV below.")
-
-SAMPLE_CSV = """User Name,TF Type,EG Type,DISC Type
+DEMO_TEAMS = {
+    "All Three Systems (10 people, mixed types)": """User Name,TF Type,EG Type,DISC Type
 Alice Chen,ENTJ,Eight,Drive
 Bob Martinez,ISFJ,Two,Support
 Carol Washington,ENTP,Seven,Influence
@@ -354,13 +284,156 @@ Frank Okafor,INTJ,Five,Clarity/Drive
 Grace Liu,ESFJ,Nine,Support
 Henry Park,ESTP,Three,Drive/Influence
 Ines Fernandez,INFP,Four,Support
-James O'Brien,ESTJ,Eight,Drive
-"""
+James O'Brien,ESTJ,Eight,Drive""",
 
-st.download_button(
-    "Download sample CSV",
-    SAMPLE_CSV,
-    file_name="sample_team_data.csv",
-    mime="text/csv",
-    key="dl_sample"
+    "Drive-Heavy Sales Team (8 people)": """User Name,TF Type,EG Type,DISC Type
+Marcus Rivera,ENTJ,Eight,Drive
+Priya Sharma,ESTP,Three,Drive/Influence
+Tyler Brooks,ENTP,Seven,Influence
+Sarah Kim,ESTJ,Eight,Drive
+Jordan Wells,ENFJ,Two,Influence/Support
+Rachel Nguyen,ENTJ,Three,Drive
+Damien Cole,ESTP,Seven,Drive/Influence
+Olivia Grant,ESFP,Seven,Influence""",
+
+    "Introvert-Heavy Engineering Team (7 people)": """User Name,TF Type,EG Type,DISC Type
+Liam Zhang,INTJ,Five,Clarity
+Sofia Petrov,INTP,Six,Clarity/Drive
+Amir Hassan,ISTJ,One,Clarity
+Yuki Tanaka,INFJ,Four,Support/Clarity
+Ben Torres,ISTP,Five,Clarity
+Mei-Lin Wu,INTJ,One,Clarity/Drive
+Nathan Cole,ENTP,Seven,Drive/Influence""",
+
+    "Small Startup Team (4 people)": """User Name,TF Type,EG Type,DISC Type
+Zara Ahmed,ENFP,Seven,Influence
+Leo Park,INTJ,Five,Clarity/Drive
+Mia Johnson,ESFJ,Two,Support
+Raj Patel,ENTJ,Three,Drive""",
+
+    "TypeFinder Only (no Enneagram or DISC)": """User Name,TF Type,EG Type,DISC Type
+Anna Lee,ENFP,,
+Carlos Ruiz,ISTJ,,
+Diana Osei,ENTJ,,
+Eric Holm,ISFP,,
+Fiona Chang,INTP,,
+George Mbeki,ESFJ,,""",
+
+    "Enneagram Only (no TypeFinder or DISC)": """User Name,TF Type,EG Type,DISC Type
+Hannah Berg,,Nine,
+Isaac Voss,,Three,
+Julia Reyes,,Six,
+Kwame Asante,,One,
+Lisa Moreau,,Nine,
+Miguel Santos,,Four,
+Nina Popov,,Six,""",
+
+    "DISC Only (no TypeFinder or Enneagram)": """User Name,TF Type,EG Type,DISC Type
+Omar Farah,,,Drive
+Paula Schmidt,,,Support
+Quinn Nakamura,,,Influence/Support
+Rosa Delgado,,,Clarity
+Sam Okonkwo,,,Drive/Influence
+Tara Singh,,,Support
+Uma Johansson,,,Clarity/Drive
+Victor Lam,,,Influence""",
+}
+
+
+# =============================================================================
+# Streamlit App
+# =============================================================================
+
+st.set_page_config(page_title="Team Summary Generator", layout="wide")
+st.title("Team Summary Generator")
+st.caption("Combined TypeFinder + Enneagram + DISC — lightweight team summaries for Truity at Work")
+
+output_mode = st.radio(
+    "Output format",
+    ["Paragraph mode", "Bullet mode", "Both (for comparison)"],
+    help="Paragraph mode: AI picks the most relevant dynamics and writes about them. "
+         "Bullet mode: fixed topic categories with team-specific content for each."
 )
+
+st.markdown("---")
+
+data_source = st.radio(
+    "Data source",
+    ["Use a demo team", "Upload CSV"],
+    horizontal=True,
+)
+
+df = None
+
+if data_source == "Use a demo team":
+    demo_choice = st.selectbox("Choose a demo team:", list(DEMO_TEAMS.keys()))
+    csv_text = DEMO_TEAMS[demo_choice]
+    df = pd.read_csv(io.StringIO(csv_text))
+    st.markdown("**Preview:**")
+    st.dataframe(df, use_container_width=True, hide_index=True)
+    st.download_button(
+        "Download this demo as CSV",
+        csv_text,
+        file_name="demo_team.csv",
+        mime="text/csv",
+        key="dl_demo"
+    )
+else:
+    st.markdown(
+        "Upload a CSV with columns: `User Name`, `TF Type`, `EG Type`, `DISC Type`. "
+        "Not every member needs all three — the tool uses whatever data is available."
+    )
+    csv_file = st.file_uploader("Choose a CSV file", type=["csv"])
+    if csv_file:
+        df = pd.read_csv(csv_file)
+        st.dataframe(df, use_container_width=True, hide_index=True)
+
+st.markdown("---")
+
+if st.button("Generate Team Summary", type="primary"):
+    if df is None:
+        st.error("Please select a demo team or upload a CSV file first.")
+    else:
+        members = process_csv(df)
+
+        if not members:
+            st.error("No valid assessment data found. "
+                     "Make sure you have columns like 'User Name', 'TF Type', 'EG Type', 'DISC Type'.")
+        else:
+            team_data = build_team_summary_text(members)
+
+            with st.expander("View parsed team data", expanded=False):
+                st.markdown(team_data)
+
+            api_key = st.secrets['API_KEY']
+
+            do_paragraph = output_mode in ["Paragraph mode", "Both (for comparison)"]
+            do_bullet = output_mode in ["Bullet mode", "Both (for comparison)"]
+
+            if do_paragraph:
+                with st.spinner("Generating paragraph summary..."):
+                    paragraph_result = generate_summary(api_key, team_data, PARAGRAPH_USER_PROMPT)
+
+                st.subheader("📝 Paragraph Mode")
+                st.markdown(paragraph_result)
+                st.download_button(
+                    "Download paragraph summary",
+                    paragraph_result,
+                    file_name="team_summary_paragraph.md",
+                    mime="text/markdown",
+                    key="dl_paragraph"
+                )
+
+            if do_bullet:
+                with st.spinner("Generating bullet summary..."):
+                    bullet_result = generate_summary(api_key, team_data, BULLET_USER_PROMPT)
+
+                st.subheader("📋 Bullet Mode")
+                st.markdown(bullet_result)
+                st.download_button(
+                    "Download bullet summary",
+                    bullet_result,
+                    file_name="team_summary_bullets.md",
+                    mime="text/markdown",
+                    key="dl_bullet"
+                )
