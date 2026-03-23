@@ -1,9 +1,7 @@
 import streamlit as st
 import pandas as pd
 from collections import Counter
-from langchain_community.chat_models import ChatOpenAI
-from langchain.prompts import PromptTemplate
-from langchain.chains import LLMChain
+from openai import OpenAI
 
 # =============================================================================
 # Type Parsing Utilities
@@ -34,10 +32,8 @@ def parse_eg_type(raw: str) -> str:
     if not raw:
         return ""
     lower = raw.strip().lower()
-    # Handle both "Nine" and "Type Nine" formats
     result = eg_map.get(lower, "")
     if not result:
-        # Try stripping "type " prefix
         stripped = lower.replace("type ", "").strip()
         result = eg_map.get(stripped, "")
     return result
@@ -72,12 +68,7 @@ def parse_disc_type(text: str) -> str:
 # =============================================================================
 
 def process_csv(df):
-    """
-    Parse the CSV and extract per-member data for all three systems.
-    Returns a dict with team_members list and aggregate stats.
-    """
     team_members = []
-
     for _, row in df.iterrows():
         name = str(row.get("User Name", "")).strip()
         if not name:
@@ -89,11 +80,9 @@ def process_csv(df):
         tf_type = parse_tf_type(str(row.get("TF Type", "")))
         if tf_type:
             member["tf_type"] = tf_type
-            # Try to get dimension scores
             for col, key in [
                 ("TF Extraversion", "tf_e"), ("TF Intuition", "tf_n"),
                 ("TF Feeling", "tf_f"), ("TF Judging", "tf_j"),
-                # Alternative column names from older exports
                 ("TF E/I", "tf_e"), ("TF N/S", "tf_n"),
                 ("TF F/T", "tf_f"), ("TF J/P", "tf_j"),
             ]:
@@ -116,7 +105,6 @@ def process_csv(df):
         if disc_type:
             member["disc_type"] = disc_type
 
-        # Only include members who have at least one valid assessment
         if any(k in member for k in ["tf_type", "eg_type", "disc_type"]):
             team_members.append(member)
 
@@ -124,15 +112,12 @@ def process_csv(df):
 
 
 def build_team_summary_text(members):
-    """
-    Build a structured text summary of team composition data to feed into the prompt.
-    """
     lines = []
     team_size = len(members)
     lines.append(f"**Team Size:** {team_size}")
     lines.append("")
 
-    # --- Per-member listing ---
+    # Per-member listing
     lines.append("**Team Members and Assessment Results:**")
     for i, m in enumerate(members, 1):
         parts = [m["name"]]
@@ -145,26 +130,22 @@ def build_team_summary_text(members):
         lines.append(f"{i}. {' | '.join(parts)}")
     lines.append("")
 
-    # --- TypeFinder aggregates ---
+    # TypeFinder aggregates
     tf_types = [m["tf_type"] for m in members if "tf_type" in m]
     if tf_types:
         lines.append("**TypeFinder Distribution:**")
         tf_counts = Counter(tf_types)
         n_tf = len(tf_types)
-
-        # Dimension preference counts
         dims = {'E': 0, 'I': 0, 'S': 0, 'N': 0, 'T': 0, 'F': 0, 'J': 0, 'P': 0}
         for t in tf_types:
-            dims[t[0]] += 1  # E or I
-            dims[t[1]] += 1  # S or N
-            dims[t[2]] += 1  # T or F
-            dims[t[3]] += 1  # J or P
-
+            dims[t[0]] += 1
+            dims[t[1]] += 1
+            dims[t[2]] += 1
+            dims[t[3]] += 1
         for pair in [('E', 'I'), ('S', 'N'), ('T', 'F'), ('J', 'P')]:
             a, b = pair
             pa = round((dims[a] / n_tf) * 100)
             lines.append(f"- {a}: {dims[a]} ({pa}%) vs {b}: {dims[b]} ({100-pa}%)")
-
         lines.append("Types present: " + ", ".join(
             f"{t} ({c})" for t, c in tf_counts.most_common()
         ))
@@ -173,7 +154,7 @@ def build_team_summary_text(members):
             lines.append(f"Types absent: {', '.join(absent)}")
         lines.append("")
 
-    # --- Enneagram aggregates ---
+    # Enneagram aggregates
     eg_types = [m["eg_type"] for m in members if "eg_type" in m]
     if eg_types:
         lines.append("**Enneagram Distribution:**")
@@ -184,33 +165,27 @@ def build_team_summary_text(members):
             c = eg_counts.get(t, 0)
             pct = round((c / n_eg) * 100) if n_eg > 0 else 0
             lines.append(f"- {t}: {c} ({pct}%)")
-
-        # Centers of intelligence
         heart = sum(eg_counts.get(f"Type {t}", 0) for t in ["Two", "Three", "Four"])
         head = sum(eg_counts.get(f"Type {t}", 0) for t in ["Five", "Six", "Seven"])
         body = sum(eg_counts.get(f"Type {t}", 0) for t in ["Eight", "Nine", "One"])
         lines.append(f"Centers: Heart (2,3,4): {heart} | Head (5,6,7): {head} | Body (8,9,1): {body}")
         lines.append("")
 
-    # --- DISC aggregates ---
+    # DISC aggregates
     disc_types = [m["disc_type"] for m in members if "disc_type" in m]
     if disc_types:
         lines.append("**DISC Distribution:**")
         disc_counts = Counter(disc_types)
         n_disc = len(disc_types)
-
-        # Primary style counts (including hybrids)
         style_counts = {'D': 0, 'I': 0, 'S': 0, 'C': 0}
         for d in disc_types:
             primary = d.split('/')[0] if '/' in d else d
             if primary in style_counts:
                 style_counts[primary] += 1
-
         for s in ['D', 'I', 'S', 'C']:
             full_name = {'D': 'Drive', 'I': 'Influence', 'S': 'Support', 'C': 'Clarity'}[s]
             pct = round((style_counts[s] / n_disc) * 100)
             lines.append(f"- {full_name} ({s}): {style_counts[s]} ({pct}%)")
-
         lines.append("Types: " + ", ".join(
             f"{t} ({c})" for t, c in disc_counts.most_common()
         ))
@@ -223,28 +198,22 @@ def build_team_summary_text(members):
 # Prompts
 # =============================================================================
 
-PARAGRAPH_PROMPT = """You are an expert organizational psychologist. You have deep expertise in the TypeFinder (similar to MBTI, with four dimensions: E/I, S/N, T/F, J/P), the Enneagram (Types One through Nine), and DISC (Drive, Influence, Support, Clarity, plus hybrid types like D/i, I/s, etc.).
+SYSTEM_PROMPT = """You are an expert organizational psychologist. You have deep expertise in the TypeFinder (similar to MBTI, with four dimensions: E/I, S/N, T/F, J/P), the Enneagram (Types One through Nine), and DISC (Drive, Influence, Support, Clarity, plus hybrid types like D/i, I/s, etc.).
 
-You are writing a brief team summary for a manager. The summary will appear in the Truity at Work platform.
-
-**Important guidelines:**
+Important guidelines:
 - Refer to the MBTI-style assessment as "TypeFinder" (never "MBTI").
 - For DISC, use Drive/Influence/Support/Clarity (not Dominance/Steadiness/Conscientiousness).
 - For Enneagram, spell out type numbers (Type One, Type Two, etc.).
 - Refer to it as "your team" or "the team" — never "our team."
 - Be specific to THIS team's actual data. Don't write generic advice that could apply to any team.
-- Focus on the 2-3 most striking or consequential patterns in the data. Don't try to cover everything.
-- Write in a warm but professional tone. No jargon-dumping.
-- Do NOT use headers or section titles in your output — just flowing prose.
+- Write in a warm but professional tone. No jargon-dumping."""
 
-{TEAM_DATA}
-
-**Your task:**
+PARAGRAPH_USER_PROMPT = """{TEAM_DATA}
 
 Write TWO sections (clearly separated by a blank line):
 
 **Section 1 — How This Team Works Together (1-2 paragraphs)**
-Look at the combined picture across all three assessment systems. Identify the 2-3 most important patterns and what they mean for how this team communicates, makes decisions, and collaborates. Be specific — name the actual types, dimensions, and dynamics at play. If there are interesting cross-system patterns (e.g., a team heavy on both DISC Drive types AND TypeFinder Thinking preference), call those out.
+Look at the combined picture across all three assessment systems. Identify the 2-3 most important patterns and what they mean for how this team communicates, makes decisions, and collaborates. Be specific — name the actual types, dimensions, and dynamics at play. If there are interesting cross-system patterns (e.g., a team heavy on both DISC Drive types AND TypeFinder Thinking preference), call those out. Focus on the most striking or consequential patterns — don't try to cover everything.
 
 Then provide 3-5 bullet points that capture the key takeaways from the paragraphs above. Format each bullet as "• [point]" on its own line.
 
@@ -253,24 +222,9 @@ Based on the team composition, identify specific development opportunities — b
 
 Then provide 3-5 bullet points that capture the key takeaways. Format each bullet as "• [point]" on its own line.
 
-Begin your output now:
-"""
+Do NOT use headers or section titles — just flowing prose followed by bullets for each section."""
 
-BULLET_PROMPT = """You are an expert organizational psychologist. You have deep expertise in the TypeFinder (similar to MBTI, with four dimensions: E/I, S/N, T/F, J/P), the Enneagram (Types One through Nine), and DISC (Drive, Influence, Support, Clarity, plus hybrid types like D/i, I/s, etc.).
-
-You are writing a brief team summary for a manager. The summary will appear in the Truity at Work platform.
-
-**Important guidelines:**
-- Refer to the MBTI-style assessment as "TypeFinder" (never "MBTI").
-- For DISC, use Drive/Influence/Support/Clarity (not Dominance/Steadiness/Conscientiousness).
-- For Enneagram, spell out type numbers (Type One, Type Two, etc.).
-- Refer to it as "your team" or "the team" — never "our team."
-- Be specific to THIS team's actual data. Don't write generic advice that could apply to any team.
-- Write in a warm but professional tone. No jargon-dumping.
-
-{TEAM_DATA}
-
-**Your task:**
+BULLET_USER_PROMPT = """{TEAM_DATA}
 
 Generate team-specific content for the following topic categories. For each topic, write 2-3 sentences that are grounded in this team's actual assessment data. Reference specific types, dimensions, and patterns — not generic platitudes.
 
@@ -292,10 +246,25 @@ Format your output exactly as follows (use these exact topic headers):
 [2-3 sentences about the team's core advantages based on their composition]
 
 **Tips for the Manager**
-[2-3 sentences of actionable advice for getting the best out of this specific team]
+[2-3 sentences of actionable advice for getting the best out of this specific team]"""
 
-Begin your output now:
-"""
+
+# =============================================================================
+# LLM Call
+# =============================================================================
+
+def generate_summary(api_key: str, team_data: str, user_prompt_template: str) -> str:
+    client = OpenAI(api_key=api_key)
+    user_content = user_prompt_template.replace("{TEAM_DATA}", team_data)
+
+    response = client.chat.completions.create(
+        model="gpt-5.3-chat-latest",
+        messages=[
+            {"role": "developer", "content": SYSTEM_PROMPT},
+            {"role": "user", "content": user_content},
+        ],
+    )
+    return response.choices[0].message.content
 
 
 # =============================================================================
@@ -339,20 +308,14 @@ if st.button("Generate Team Summary"):
                 with st.expander("View parsed team data", expanded=False):
                     st.markdown(team_data)
 
-                chat_model = ChatOpenAI(
-                    openai_api_key=st.secrets['API_KEY'],
-                    model_name='gpt-4o-2024-08-06',
-                    temperature=0.3
-                )
+                api_key = st.secrets['API_KEY']
 
                 generate_paragraph = output_mode in ["Paragraph mode", "Both (for comparison)"]
                 generate_bullet = output_mode in ["Bullet mode", "Both (for comparison)"]
 
                 if generate_paragraph:
                     with st.spinner("Generating paragraph summary..."):
-                        prompt = PromptTemplate.from_template(PARAGRAPH_PROMPT)
-                        chain = LLMChain(prompt=prompt, llm=chat_model)
-                        paragraph_result = chain.run(TEAM_DATA=team_data)
+                        paragraph_result = generate_summary(api_key, team_data, PARAGRAPH_USER_PROMPT)
 
                     st.subheader("📝 Paragraph Mode")
                     st.markdown(paragraph_result)
@@ -366,9 +329,7 @@ if st.button("Generate Team Summary"):
 
                 if generate_bullet:
                     with st.spinner("Generating bullet summary..."):
-                        prompt = PromptTemplate.from_template(BULLET_PROMPT)
-                        chain = LLMChain(prompt=prompt, llm=chat_model)
-                        bullet_result = chain.run(TEAM_DATA=team_data)
+                        bullet_result = generate_summary(api_key, team_data, BULLET_USER_PROMPT)
 
                     st.subheader("📋 Bullet Mode")
                     st.markdown(bullet_result)
@@ -380,9 +341,8 @@ if st.button("Generate Team Summary"):
                         key="dl_bullet"
                     )
 
-                # Also generate a sample CSV for testing
                 st.markdown("---")
-                st.caption("Need test data? Download this sample CSV to try the tool.")
+                st.caption("Need test data? Download the sample CSV below.")
 
 SAMPLE_CSV = """User Name,TF Type,EG Type,DISC Type
 Alice Chen,ENTJ,Eight,Drive
