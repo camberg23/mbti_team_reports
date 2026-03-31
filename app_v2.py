@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+import io
 from collections import Counter
 from openai import OpenAI
 
@@ -7,7 +8,6 @@ from openai import OpenAI
 # Type Parsing Utilities
 # =============================================================================
 
-# --- TypeFinder ---
 typefinder_types = [
     'INTJ', 'INTP', 'ENTJ', 'ENTP',
     'INFJ', 'INFP', 'ENFJ', 'ENFP',
@@ -21,7 +21,6 @@ def parse_tf_type(tf_str: str) -> str:
     tf_str = str(tf_str).strip().upper()
     return tf_str if tf_str in typefinder_types else ""
 
-# --- Enneagram ---
 eg_map = {
     "one": "Type One", "two": "Type Two", "three": "Type Three",
     "four": "Type Four", "five": "Type Five", "six": "Type Six",
@@ -34,14 +33,10 @@ def parse_eg_type(raw: str) -> str:
     lower = raw.strip().lower()
     result = eg_map.get(lower, "")
     if not result:
-        stripped = lower.replace("type ", "").strip()
-        result = eg_map.get(stripped, "")
+        result = eg_map.get(lower.replace("type ", "").strip(), "")
     return result
 
-# --- DISC ---
-csv_to_disc_map = {
-    "Drive": "D", "Influence": "I", "Support": "S", "Clarity": "C"
-}
+csv_to_disc_map = {"Drive": "D", "Influence": "I", "Support": "S", "Clarity": "C"}
 
 def parse_disc_type(text: str) -> str:
     if not text:
@@ -64,205 +59,228 @@ def parse_disc_type(text: str) -> str:
 
 
 # =============================================================================
-# Data Processing
+# Data Processing — one function per system
 # =============================================================================
 
-def process_csv(df):
-    team_members = []
+def extract_typefinder_data(df):
+    """Extract TypeFinder data and build summary text."""
+    members = []
     for _, row in df.iterrows():
         name = str(row.get("User Name", "")).strip()
-        if not name:
-            continue
-
-        member = {"name": name}
-
-        # TypeFinder
         tf_type = parse_tf_type(str(row.get("TF Type", "")))
-        if tf_type:
-            member["tf_type"] = tf_type
-            for col, key in [
-                ("TF Extraversion", "tf_e"), ("TF Intuition", "tf_n"),
-                ("TF Feeling", "tf_f"), ("TF Judging", "tf_j"),
-                ("TF E/I", "tf_e"), ("TF N/S", "tf_n"),
-                ("TF F/T", "tf_f"), ("TF J/P", "tf_j"),
-            ]:
-                if col in df.columns and key not in member:
-                    try:
-                        val = float(row.get(col, ""))
-                        member[key] = val
-                    except (ValueError, TypeError):
-                        pass
+        if name and tf_type:
+            members.append({"name": name, "type": tf_type})
+    if not members:
+        return None, []
 
-        # Enneagram
-        eg_raw = str(row.get("EG Type", "")).strip()
-        eg_type = parse_eg_type(eg_raw)
-        if eg_type:
-            member["eg_type"] = eg_type
+    n = len(members)
+    type_counts = Counter(m["type"] for m in members)
+    dims = {'E': 0, 'I': 0, 'S': 0, 'N': 0, 'T': 0, 'F': 0, 'J': 0, 'P': 0}
+    for m in members:
+        t = m["type"]
+        dims[t[0]] += 1; dims[t[1]] += 1; dims[t[2]] += 1; dims[t[3]] += 1
 
-        # DISC
-        disc_raw = str(row.get("DISC Type", "")).strip()
-        disc_type = parse_disc_type(disc_raw)
-        if disc_type:
-            member["disc_type"] = disc_type
-
-        if any(k in member for k in ["tf_type", "eg_type", "disc_type"]):
-            team_members.append(member)
-
-    return team_members
-
-
-def build_team_summary_text(members):
-    lines = []
-    team_size = len(members)
-    lines.append(f"**Team Size:** {team_size}")
-    lines.append("")
-
-    # Per-member listing
-    lines.append("**Team Members and Assessment Results:**")
+    lines = [f"Team Size: {n}", ""]
+    lines.append("Team Members:")
     for i, m in enumerate(members, 1):
-        parts = [m["name"]]
-        if "tf_type" in m:
-            parts.append(f"TypeFinder: {m['tf_type']}")
-        if "eg_type" in m:
-            parts.append(f"Enneagram: {m['eg_type']}")
-        if "disc_type" in m:
-            parts.append(f"DISC: {m['disc_type']}")
-        lines.append(f"{i}. {' | '.join(parts)}")
+        lines.append(f"{i}. {m['name']}: {m['type']}")
     lines.append("")
+    lines.append("Dimension Preferences:")
+    for a, b in [('E','I'), ('S','N'), ('T','F'), ('J','P')]:
+        pa = round((dims[a] / n) * 100)
+        lines.append(f"- {a}: {dims[a]} ({pa}%) vs {b}: {dims[b]} ({100-pa}%)")
+    lines.append("")
+    lines.append("Types present: " + ", ".join(f"{t} ({c})" for t, c in type_counts.most_common()))
+    absent = [t for t in typefinder_types if t not in type_counts]
+    if absent:
+        lines.append(f"Types absent: {', '.join(absent)}")
+    return "\n".join(lines), members
 
-    # TypeFinder aggregates
-    tf_types = [m["tf_type"] for m in members if "tf_type" in m]
-    if tf_types:
-        lines.append("**TypeFinder Distribution:**")
-        tf_counts = Counter(tf_types)
-        n_tf = len(tf_types)
-        dims = {'E': 0, 'I': 0, 'S': 0, 'N': 0, 'T': 0, 'F': 0, 'J': 0, 'P': 0}
-        for t in tf_types:
-            dims[t[0]] += 1
-            dims[t[1]] += 1
-            dims[t[2]] += 1
-            dims[t[3]] += 1
-        for pair in [('E', 'I'), ('S', 'N'), ('T', 'F'), ('J', 'P')]:
-            a, b = pair
-            pa = round((dims[a] / n_tf) * 100)
-            lines.append(f"- {a}: {dims[a]} ({pa}%) vs {b}: {dims[b]} ({100-pa}%)")
-        lines.append("Types present: " + ", ".join(
-            f"{t} ({c})" for t, c in tf_counts.most_common()
-        ))
-        absent = [t for t in typefinder_types if t not in tf_counts]
-        if absent:
-            lines.append(f"Types absent: {', '.join(absent)}")
-        lines.append("")
 
-    # Enneagram aggregates
-    eg_types = [m["eg_type"] for m in members if "eg_type" in m]
-    if eg_types:
-        lines.append("**Enneagram Distribution:**")
-        eg_counts = Counter(eg_types)
-        n_eg = len(eg_types)
-        all_eg = [f"Type {w}" for w in ["One","Two","Three","Four","Five","Six","Seven","Eight","Nine"]]
-        for t in all_eg:
-            c = eg_counts.get(t, 0)
-            pct = round((c / n_eg) * 100) if n_eg > 0 else 0
-            lines.append(f"- {t}: {c} ({pct}%)")
-        heart = sum(eg_counts.get(f"Type {t}", 0) for t in ["Two", "Three", "Four"])
-        head = sum(eg_counts.get(f"Type {t}", 0) for t in ["Five", "Six", "Seven"])
-        body = sum(eg_counts.get(f"Type {t}", 0) for t in ["Eight", "Nine", "One"])
-        lines.append(f"Centers: Heart (2,3,4): {heart} | Head (5,6,7): {head} | Body (8,9,1): {body}")
-        lines.append("")
+def extract_enneagram_data(df):
+    """Extract Enneagram data and build summary text."""
+    members = []
+    for _, row in df.iterrows():
+        name = str(row.get("User Name", "")).strip()
+        eg_type = parse_eg_type(str(row.get("EG Type", "")))
+        if name and eg_type:
+            members.append({"name": name, "type": eg_type})
+    if not members:
+        return None, []
 
-    # DISC aggregates
-    disc_types = [m["disc_type"] for m in members if "disc_type" in m]
-    if disc_types:
-        lines.append("**DISC Distribution:**")
-        disc_counts = Counter(disc_types)
-        n_disc = len(disc_types)
-        style_counts = {'D': 0, 'I': 0, 'S': 0, 'C': 0}
-        for d in disc_types:
-            primary = d.split('/')[0] if '/' in d else d
-            if primary in style_counts:
-                style_counts[primary] += 1
-        for s in ['D', 'I', 'S', 'C']:
-            full_name = {'D': 'Drive', 'I': 'Influence', 'S': 'Support', 'C': 'Clarity'}[s]
-            pct = round((style_counts[s] / n_disc) * 100)
-            lines.append(f"- {full_name} ({s}): {style_counts[s]} ({pct}%)")
-        lines.append("Types: " + ", ".join(
-            f"{t} ({c})" for t, c in disc_counts.most_common()
-        ))
-        lines.append("")
+    n = len(members)
+    type_counts = Counter(m["type"] for m in members)
+    all_eg = [f"Type {w}" for w in ["One","Two","Three","Four","Five","Six","Seven","Eight","Nine"]]
 
-    return "\n".join(lines)
+    lines = [f"Team Size: {n}", ""]
+    lines.append("Team Members:")
+    for i, m in enumerate(members, 1):
+        lines.append(f"{i}. {m['name']}: {m['type']}")
+    lines.append("")
+    lines.append("Type Distribution:")
+    for t in all_eg:
+        c = type_counts.get(t, 0)
+        pct = round((c / n) * 100) if n > 0 else 0
+        lines.append(f"- {t}: {c} ({pct}%)")
+    lines.append("")
+    heart = sum(type_counts.get(f"Type {t}", 0) for t in ["Two", "Three", "Four"])
+    head = sum(type_counts.get(f"Type {t}", 0) for t in ["Five", "Six", "Seven"])
+    body = sum(type_counts.get(f"Type {t}", 0) for t in ["Eight", "Nine", "One"])
+    lines.append(f"Centers of Intelligence: Heart (2,3,4): {heart} | Head (5,6,7): {head} | Body (8,9,1): {body}")
+    absent = [t for t in all_eg if type_counts.get(t, 0) == 0]
+    if absent:
+        lines.append(f"Types absent: {', '.join(absent)}")
+    return "\n".join(lines), members
+
+
+def extract_disc_data(df):
+    """Extract DISC data and build summary text."""
+    members = []
+    for _, row in df.iterrows():
+        name = str(row.get("User Name", "")).strip()
+        disc_type = parse_disc_type(str(row.get("DISC Type", "")))
+        if name and disc_type:
+            members.append({"name": name, "type": disc_type})
+    if not members:
+        return None, []
+
+    n = len(members)
+    type_counts = Counter(m["type"] for m in members)
+    style_counts = {'D': 0, 'I': 0, 'S': 0, 'C': 0}
+    for m in members:
+        primary = m["type"].split('/')[0] if '/' in m["type"] else m["type"]
+        if primary in style_counts:
+            style_counts[primary] += 1
+
+    lines = [f"Team Size: {n}", ""]
+    lines.append("Team Members:")
+    for i, m in enumerate(members, 1):
+        lines.append(f"{i}. {m['name']}: {m['type']}")
+    lines.append("")
+    lines.append("Primary Style Distribution:")
+    for s in ['D', 'I', 'S', 'C']:
+        full = {'D': 'Drive', 'I': 'Influence', 'S': 'Support', 'C': 'Clarity'}[s]
+        pct = round((style_counts[s] / n) * 100)
+        lines.append(f"- {full} ({s}): {style_counts[s]} ({pct}%)")
+    lines.append("")
+    lines.append("Detailed Types: " + ", ".join(f"{t} ({c})" for t, c in type_counts.most_common()))
+    return "\n".join(lines), members
 
 
 # =============================================================================
-# Prompts
+# System-Specific Prompts
 # =============================================================================
 
-SYSTEM_PROMPT = """You are an expert organizational psychologist. You have deep expertise in the TypeFinder (similar to MBTI, with four dimensions: E/I, S/N, T/F, J/P), the Enneagram (Types One through Nine), and DISC (Drive, Influence, Support, Clarity, plus hybrid types like D/i, I/s, etc.).
+TYPEFINDER_SYSTEM = """You are an expert organizational psychologist specializing in the TypeFinder personality framework.
+
+TypeFinder has four dimensions:
+1) Extraversion (E) vs. Introversion (I)
+2) Sensing (S) vs. Intuition (N)
+3) Thinking (T) vs. Feeling (F)
+4) Judging (J) vs. Perceiving (P)
 
 Important guidelines:
-- Refer to the MBTI-style assessment as "TypeFinder" (never "MBTI").
-- For DISC, use Drive/Influence/Support/Clarity (not Dominance/Steadiness/Conscientiousness).
-- For Enneagram, spell out type numbers (Type One, Type Two, etc.).
-- Refer to it as "your team" or "the team" — never "our team."
-- Be specific to THIS team's actual data. Don't write generic advice that could apply to any team.
+- Always call it "TypeFinder" (never "MBTI" or "Myers-Briggs").
+- Use "dimension" for the four pairs, and "preference" only for one side of a dimension.
+- Refer to it as "your team" or "the team," never "our team."
+- Do NOT address the reader as "the manager" or assume any specific job title. Write so the content is useful whether the reader is a team lead, a peer, or the team itself.
+- Be specific to THIS team's actual data. Don't write generic advice.
 - Write in a warm but professional tone. No jargon-dumping."""
 
-PARAGRAPH_USER_PROMPT = """{TEAM_DATA}
+TYPEFINDER_USER = """{TEAM_DATA}
 
-Write TWO sections (clearly separated by a blank line):
+Write TWO sections:
 
-**Section 1 — How This Team Works Together (1-2 paragraphs)**
-Look at the combined picture across all three assessment systems. Identify the 2-3 most important patterns and what they mean for how this team communicates, makes decisions, and collaborates. Be specific — name the actual types, dimensions, and dynamics at play. If there are interesting cross-system patterns (e.g., a team heavy on both DISC Drive types AND TypeFinder Thinking preference), call those out. Focus on the most striking or consequential patterns — don't try to cover everything.
+**How This Team Works Together**
+1-2 paragraphs identifying the 2-3 most important patterns in this team's TypeFinder composition and what they mean for communication, decision-making, and collaboration. Be specific: name the actual types, dimension splits, and dynamics at play. Focus on the most striking patterns rather than trying to cover everything.
 
-Then provide 3-5 bullet points that capture the key takeaways from the paragraphs above. Format each bullet as "• [point]" on its own line.
+Then 3-5 bullet points capturing the key takeaways. Format each as "• [point]".
 
-**Section 2 — How the Manager Can Help This Team Grow (1-2 paragraphs)**
-Based on the team composition, identify specific development opportunities — blind spots, communication gaps, under-represented perspectives, or friction points that the manager should be aware of. Make recommendations actionable and tied to the actual type data.
+**Opportunities for Growth**
+1-2 paragraphs identifying specific development opportunities based on the team's TypeFinder composition: blind spots from missing or under-represented preferences, communication gaps between different types, or friction points. Make recommendations actionable and tied to the actual type data.
 
-Then provide 3-5 bullet points that capture the key takeaways. Format each bullet as "• [point]" on its own line.
+Then 3-5 bullet points capturing the key takeaways. Format each as "• [point]".
 
-Start Section 1 with the header "**How This Team Works Together**" on its own line, then the paragraphs, then the bullets.
-Start Section 2 with the header "**How the Manager Can Help This Team Grow**" on its own line, then the paragraphs, then the bullets.
-Do not add any other headers or formatting beyond these two."""
+Use ONLY these two bold headers. No other headers or formatting."""
 
-BULLET_USER_PROMPT = """{TEAM_DATA}
 
-Generate team-specific content for the following topic categories. For each topic, write 2-3 sentences that are grounded in this team's actual assessment data. Reference specific types, dimensions, and patterns — not generic platitudes.
+ENNEAGRAM_SYSTEM = """You are an expert organizational psychologist specializing in the Enneagram personality framework.
 
-Format your output exactly as follows (use these exact topic headers):
+The Enneagram has nine types (Type One through Type Nine), grouped into three Centers of Intelligence:
+- Body Center (Types Eight, Nine, One): instinct-driven, focused on autonomy and control
+- Heart Center (Types Two, Three, Four): emotion-driven, focused on identity and connection
+- Head Center (Types Five, Six, Seven): thinking-driven, focused on security and understanding
 
-**Communication Style**
-[2-3 sentences about how this team's personality composition shapes their communication patterns]
+Important guidelines:
+- Always spell out type numbers (Type One, Type Two, etc.).
+- Refer to it as "your team" or "the team," never "our team."
+- Do NOT address the reader as "the manager" or assume any specific job title. Write so the content is useful whether the reader is a team lead, a peer, or the team itself.
+- Be specific to THIS team's actual data. Don't write generic advice.
+- Write in a warm but professional tone. No jargon-dumping."""
 
-**Decision-Making**
-[2-3 sentences about how the team approaches decisions based on their types]
+ENNEAGRAM_USER = """{TEAM_DATA}
 
-**Collaboration & Work Style**
-[2-3 sentences about how team members work together day-to-day]
+Write TWO sections:
 
-**Potential Blind Spots**
-[2-3 sentences about what perspectives or approaches may be under-represented]
+**How This Team Works Together**
+1-2 paragraphs identifying the 2-3 most important patterns in this team's Enneagram composition and what they mean for communication, decision-making, and collaboration. Reference the Centers of Intelligence balance, dominant types, and the specific interpersonal dynamics they create. Focus on the most striking patterns.
 
-**Team Strengths**
-[2-3 sentences about the team's core advantages based on their composition]
+Then 3-5 bullet points capturing the key takeaways. Format each as "• [point]".
 
-**Tips for the Manager**
-[2-3 sentences of actionable advice for getting the best out of this specific team]"""
+**Opportunities for Growth**
+1-2 paragraphs identifying specific development opportunities: blind spots from absent types or under-represented centers, tension points between types, or tendencies the team should watch for. Make recommendations actionable and tied to the actual type data.
+
+Then 3-5 bullet points capturing the key takeaways. Format each as "• [point]".
+
+Use ONLY these two bold headers. No other headers or formatting."""
+
+
+DISC_SYSTEM = """You are an expert organizational psychologist specializing in the DISC personality framework.
+
+DISC has four primary styles:
+- Drive (D): direct, results-oriented, competitive
+- Influence (I): enthusiastic, collaborative, optimistic
+- Support (S): patient, reliable, team-oriented
+- Clarity (C): analytical, detail-oriented, systematic
+
+Hybrid types combine two styles (e.g., D/i, I/s, S/c), where the second letter is lowercase and separated by a slash.
+
+Important guidelines:
+- Use Drive/Influence/Support/Clarity (NOT Dominance/Steadiness/Conscientiousness).
+- For hybrid types, always use slash-lowercase (e.g., D/i, C/s).
+- Refer to it as "your team" or "the team," never "our team."
+- Do NOT address the reader as "the manager" or assume any specific job title. Write so the content is useful whether the reader is a team lead, a peer, or the team itself.
+- Be specific to THIS team's actual data. Don't write generic advice.
+- Write in a warm but professional tone. No jargon-dumping."""
+
+DISC_USER = """{TEAM_DATA}
+
+Write TWO sections:
+
+**How This Team Works Together**
+1-2 paragraphs identifying the 2-3 most important patterns in this team's DISC composition and what they mean for communication, decision-making, and collaboration. Reference the balance of primary styles, any dominant clusters, and how hybrid types add nuance. Focus on the most striking patterns.
+
+Then 3-5 bullet points capturing the key takeaways. Format each as "• [point]".
+
+**Opportunities for Growth**
+1-2 paragraphs identifying specific development opportunities: blind spots from missing or under-represented styles, pace or communication mismatches, or friction points between styles. Make recommendations actionable and tied to the actual type data.
+
+Then 3-5 bullet points capturing the key takeaways. Format each as "• [point]".
+
+Use ONLY these two bold headers. No other headers or formatting."""
 
 
 # =============================================================================
 # LLM Call
 # =============================================================================
 
-def generate_summary(api_key: str, team_data: str, user_prompt_template: str) -> str:
+def generate_summary(api_key, team_data, system_prompt, user_prompt_template):
     client = OpenAI(api_key=api_key)
     user_content = user_prompt_template.replace("{TEAM_DATA}", team_data)
-
     response = client.chat.completions.create(
         model="gpt-5.3-chat-latest",
         messages=[
-            {"role": "developer", "content": SYSTEM_PROMPT},
+            {"role": "developer", "content": system_prompt},
             {"role": "user", "content": user_content},
         ],
     )
@@ -273,72 +291,117 @@ def generate_summary(api_key: str, team_data: str, user_prompt_template: str) ->
 # Demo Datasets
 # =============================================================================
 
-import io
+TF_DEMOS = {
+    "Mixed Team (10 people)": """User Name,TF Type
+Alice Chen,ENTJ
+Bob Martinez,ISFJ
+Carol Washington,ENTP
+Dave Kim,ISTJ
+Eva Petrova,ENFP
+Frank Okafor,INTJ
+Grace Liu,ESFJ
+Henry Park,ESTP
+Ines Fernandez,INFP
+James O'Brien,ESTJ""",
 
-DEMO_TEAMS = {
-    "All Three Systems (10 people, mixed types)": """User Name,TF Type,EG Type,DISC Type
-Alice Chen,ENTJ,Eight,Drive
-Bob Martinez,ISFJ,Two,Support
-Carol Washington,ENTP,Seven,Influence
-Dave Kim,ISTJ,One,Clarity
-Eva Petrova,ENFP,Four,Influence/Support
-Frank Okafor,INTJ,Five,Clarity/Drive
-Grace Liu,ESFJ,Nine,Support
-Henry Park,ESTP,Three,Drive/Influence
-Ines Fernandez,INFP,Four,Support
-James O'Brien,ESTJ,Eight,Drive""",
+    "Introvert-Heavy Engineering Team (7 people)": """User Name,TF Type
+Liam Zhang,INTJ
+Sofia Petrov,INTP
+Amir Hassan,ISTJ
+Yuki Tanaka,INFJ
+Ben Torres,ISTP
+Mei-Lin Wu,INTJ
+Nathan Cole,ENTP""",
 
-    "Drive-Heavy Sales Team (8 people)": """User Name,TF Type,EG Type,DISC Type
-Marcus Rivera,ENTJ,Eight,Drive
-Priya Sharma,ESTP,Three,Drive/Influence
-Tyler Brooks,ENTP,Seven,Influence
-Sarah Kim,ESTJ,Eight,Drive
-Jordan Wells,ENFJ,Two,Influence/Support
-Rachel Nguyen,ENTJ,Three,Drive
-Damien Cole,ESTP,Seven,Drive/Influence
-Olivia Grant,ESFP,Seven,Influence""",
+    "Extravert Sales Team (6 people)": """User Name,TF Type
+Marcus Rivera,ENTJ
+Priya Sharma,ESTP
+Tyler Brooks,ENTP
+Sarah Kim,ESTJ
+Jordan Wells,ENFJ
+Olivia Grant,ESFP""",
+}
 
-    "Introvert-Heavy Engineering Team (7 people)": """User Name,TF Type,EG Type,DISC Type
-Liam Zhang,INTJ,Five,Clarity
-Sofia Petrov,INTP,Six,Clarity/Drive
-Amir Hassan,ISTJ,One,Clarity
-Yuki Tanaka,INFJ,Four,Support/Clarity
-Ben Torres,ISTP,Five,Clarity
-Mei-Lin Wu,INTJ,One,Clarity/Drive
-Nathan Cole,ENTP,Seven,Drive/Influence""",
+EG_DEMOS = {
+    "Mixed Team (8 people)": """User Name,EG Type
+Hannah Berg,Nine
+Isaac Voss,Three
+Julia Reyes,Six
+Kwame Asante,One
+Lisa Moreau,Nine
+Miguel Santos,Four
+Nina Popov,Six
+Derek Choi,Eight""",
 
-    "Small Startup Team (4 people)": """User Name,TF Type,EG Type,DISC Type
-Zara Ahmed,ENFP,Seven,Influence
-Leo Park,INTJ,Five,Clarity/Drive
-Mia Johnson,ESFJ,Two,Support
-Raj Patel,ENTJ,Three,Drive""",
+    "Heart-Heavy Creative Team (6 people)": """User Name,EG Type
+Amara Obi,Two
+Chen Wei,Three
+Rosa Delgado,Four
+Tomás Silva,Four
+Leah Goldstein,Three
+Dante Moore,Two""",
 
-    "TypeFinder Only (no Enneagram or DISC)": """User Name,TF Type,EG Type,DISC Type
-Anna Lee,ENFP,,
-Carlos Ruiz,ISTJ,,
-Diana Osei,ENTJ,,
-Eric Holm,ISFP,,
-Fiona Chang,INTP,,
-George Mbeki,ESFJ,,""",
+    "Head-Heavy Analyst Team (7 people)": """User Name,EG Type
+Sven Lindqvist,Five
+Fatima Al-Rashid,Six
+Kenji Yamamoto,Five
+Priya Nair,Seven
+Oscar Mendez,Six
+Elin Strand,Six
+Raj Kapoor,One""",
+}
 
-    "Enneagram Only (no TypeFinder or DISC)": """User Name,TF Type,EG Type,DISC Type
-Hannah Berg,,Nine,
-Isaac Voss,,Three,
-Julia Reyes,,Six,
-Kwame Asante,,One,
-Lisa Moreau,,Nine,
-Miguel Santos,,Four,
-Nina Popov,,Six,""",
+DISC_DEMOS = {
+    "Mixed Team (8 people)": """User Name,DISC Type
+Omar Farah,Drive
+Paula Schmidt,Support
+Quinn Nakamura,Influence/Support
+Rosa Delgado,Clarity
+Sam Okonkwo,Drive/Influence
+Tara Singh,Support
+Uma Johansson,Clarity/Drive
+Victor Lam,Influence""",
 
-    "DISC Only (no TypeFinder or Enneagram)": """User Name,TF Type,EG Type,DISC Type
-Omar Farah,,,Drive
-Paula Schmidt,,,Support
-Quinn Nakamura,,,Influence/Support
-Rosa Delgado,,,Clarity
-Sam Okonkwo,,,Drive/Influence
-Tara Singh,,,Support
-Uma Johansson,,,Clarity/Drive
-Victor Lam,,,Influence""",
+    "Drive-Heavy Leadership Team (6 people)": """User Name,DISC Type
+Alex Petrov,Drive
+Morgan Chen,Drive/Influence
+Casey Williams,Drive
+Jordan Blake,Influence
+Sam Torres,Drive/Clarity
+Riley Okafor,Clarity""",
+
+    "Support-Heavy Operations Team (7 people)": """User Name,DISC Type
+Dana Kim,Support
+Eli Washington,Support/Clarity
+Fran Mbeki,Support
+Greta Holm,Clarity
+Harper Reyes,Support/Influence
+Indra Patel,Support
+Jules Fernandez,Influence""",
+}
+
+SYSTEM_CONFIGS = {
+    "TypeFinder": {
+        "demos": TF_DEMOS,
+        "extract_fn": extract_typefinder_data,
+        "system_prompt": TYPEFINDER_SYSTEM,
+        "user_prompt": TYPEFINDER_USER,
+        "type_col": "TF Type",
+    },
+    "Enneagram": {
+        "demos": EG_DEMOS,
+        "extract_fn": extract_enneagram_data,
+        "system_prompt": ENNEAGRAM_SYSTEM,
+        "user_prompt": ENNEAGRAM_USER,
+        "type_col": "EG Type",
+    },
+    "DISC": {
+        "demos": DISC_DEMOS,
+        "extract_fn": extract_disc_data,
+        "system_prompt": DISC_SYSTEM,
+        "user_prompt": DISC_USER,
+        "type_col": "DISC Type",
+    },
 }
 
 
@@ -348,14 +411,15 @@ Victor Lam,,,Influence""",
 
 st.set_page_config(page_title="Team Summary Generator", layout="wide")
 st.title("Team Summary Generator")
-st.caption("Combined TypeFinder + Enneagram + DISC — lightweight team summaries for Truity at Work")
+st.caption("Single-system team summaries for Truity at Work")
 
-output_mode = st.radio(
-    "Output format",
-    ["Paragraph mode", "Bullet mode", "Both (for comparison)"],
-    help="Paragraph mode: AI picks the most relevant dynamics and writes about them. "
-         "Bullet mode: fixed topic categories with team-specific content for each."
+system_choice = st.radio(
+    "Assessment system",
+    ["TypeFinder", "Enneagram", "DISC"],
+    horizontal=True,
 )
+
+config = SYSTEM_CONFIGS[system_choice]
 
 st.markdown("---")
 
@@ -368,23 +432,21 @@ data_source = st.radio(
 df = None
 
 if data_source == "Use a demo team":
-    demo_choice = st.selectbox("Choose a demo team:", list(DEMO_TEAMS.keys()))
-    csv_text = DEMO_TEAMS[demo_choice]
+    demo_choice = st.selectbox("Choose a demo team:", list(config["demos"].keys()))
+    csv_text = config["demos"][demo_choice]
     df = pd.read_csv(io.StringIO(csv_text))
     st.markdown("**Preview:**")
     st.dataframe(df, use_container_width=True, hide_index=True)
     st.download_button(
         "Download this demo as CSV",
         csv_text,
-        file_name="demo_team.csv",
+        file_name=f"demo_{system_choice.lower()}_team.csv",
         mime="text/csv",
         key="dl_demo"
     )
 else:
-    st.markdown(
-        "Upload a CSV with columns: `User Name`, `TF Type`, `EG Type`, `DISC Type`. "
-        "Not every member needs all three — the tool uses whatever data is available."
-    )
+    type_col = config["type_col"]
+    st.markdown(f"Upload a CSV with columns: `User Name` and `{type_col}`.")
     csv_file = st.file_uploader("Choose a CSV file", type=["csv"])
     if csv_file:
         df = pd.read_csv(csv_file)
@@ -396,46 +458,28 @@ if st.button("Generate Team Summary", type="primary"):
     if df is None:
         st.error("Please select a demo team or upload a CSV file first.")
     else:
-        members = process_csv(df)
+        team_data, members = config["extract_fn"](df)
 
-        if not members:
-            st.error("No valid assessment data found. "
-                     "Make sure you have columns like 'User Name', 'TF Type', 'EG Type', 'DISC Type'.")
+        if not team_data:
+            st.error(f"No valid {system_choice} data found in the CSV.")
         else:
-            team_data = build_team_summary_text(members)
-
             with st.expander("View parsed team data", expanded=False):
-                st.markdown(team_data)
+                st.text(team_data)
 
             api_key = st.secrets['API_KEY']
 
-            do_paragraph = output_mode in ["Paragraph mode", "Both (for comparison)"]
-            do_bullet = output_mode in ["Bullet mode", "Both (for comparison)"]
-
-            if do_paragraph:
-                with st.spinner("Generating paragraph summary..."):
-                    paragraph_result = generate_summary(api_key, team_data, PARAGRAPH_USER_PROMPT)
-
-                st.subheader("📝 Paragraph Mode")
-                st.markdown(paragraph_result)
-                st.download_button(
-                    "Download paragraph summary",
-                    paragraph_result,
-                    file_name="team_summary_paragraph.md",
-                    mime="text/markdown",
-                    key="dl_paragraph"
+            with st.spinner(f"Generating {system_choice} team summary..."):
+                result = generate_summary(
+                    api_key, team_data,
+                    config["system_prompt"],
+                    config["user_prompt"]
                 )
 
-            if do_bullet:
-                with st.spinner("Generating bullet summary..."):
-                    bullet_result = generate_summary(api_key, team_data, BULLET_USER_PROMPT)
-
-                st.subheader("📋 Bullet Mode")
-                st.markdown(bullet_result)
-                st.download_button(
-                    "Download bullet summary",
-                    bullet_result,
-                    file_name="team_summary_bullets.md",
-                    mime="text/markdown",
-                    key="dl_bullet"
-                )
+            st.markdown(result)
+            st.download_button(
+                "Download summary",
+                result,
+                file_name=f"team_summary_{system_choice.lower()}.md",
+                mime="text/markdown",
+                key="dl_summary"
+            )
